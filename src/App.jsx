@@ -8,41 +8,108 @@ function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [savedBlueprints, setSavedBlueprints] = useState([]);
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
+  const [authToken, setAuthToken] = useState(localStorage.getItem('authToken'));
 
-  // Fetch user's blueprints when logged in
+  // Load token from localStorage on startup
   useEffect(() => {
-    if (user) {
-      fetchUserBlueprints();
+    const token = localStorage.getItem('authToken');
+    if (token) {
+      setAuthToken(token);
+      fetchUserProfile(token);
     }
-  }, [user]);
+  }, []);
 
-  const fetchUserBlueprints = async () => {
+  const fetchUserProfile = async (token) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/blueprints/${user.id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch blueprints');
+      const response = await fetch('http://localhost:5000/api/auth/me', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+      } else {
+        // If token is invalid, clear it
+        localStorage.removeItem('authToken');
+        setAuthToken(null);
+        setUser(null);
       }
-      const data = await response.json();
-      setSavedBlueprints(data);
     } catch (error) {
-      console.error('Error fetching blueprints:', error);
-      setError('Failed to fetch saved blueprints');
+      console.error('Error fetching user profile:', error);
     }
   };
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setUser({
-      id: loginForm.username,
-      username: loginForm.username
-    });
-    setIsLoginModalOpen(false);
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: loginForm.email,
+          password: loginForm.password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed');
+      }
+
+      // Save token and user data
+      localStorage.setItem('authToken', data.token);
+      setAuthToken(data.token);
+      setUser(data.user);
+      setIsLoginModalOpen(false);
+      setError(null);
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: loginForm.email.split('@')[0], // Use email prefix as username
+          email: loginForm.email,
+          password: loginForm.password
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Registration failed');
+      }
+
+      // Auto-login after registration
+      localStorage.setItem('authToken', data.token);
+      setAuthToken(data.token);
+      setUser(data.user);
+      setIsLoginModalOpen(false);
+      setError(null);
+    } catch (error) {
+      setError(error.message);
+    }
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('authToken');
+    setAuthToken(null);
     setUser(null);
     setSavedBlueprints([]);
   };
@@ -53,6 +120,12 @@ function App() {
       return;
     }
 
+    if (!authToken) {
+      setError('Please log in to generate blueprints');
+      setIsLoginModalOpen(true);
+      return;
+    }
+
     setError(null);
     setIsGenerating(true);
     try {
@@ -60,6 +133,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
           idea: appIdea,
@@ -67,35 +141,33 @@ function App() {
         }),
       });
 
-      const data = await generateResponse.json();
-
       if (!generateResponse.ok) {
-        throw new Error(data.message || 'Failed to generate blueprint');
+        const errorData = await generateResponse.json();
+        throw new Error(errorData.message || 'Failed to generate blueprint');
       }
 
+      const data = await generateResponse.json();
       setBlueprint(data.markdown);
 
-      if (user) {
-        const saveResponse = await fetch('http://localhost:5000/api/blueprints', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: user.id,
-            ideaInput: appIdea,
-            platform,
-            generatedMarkdown: data.markdown
-          }),
-        });
+      // Save blueprint
+      const saveResponse = await fetch('http://localhost:5000/api/blueprints', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          ideaInput: appIdea,
+          platform,
+          generatedMarkdown: data.markdown
+        }),
+      });
 
-        if (!saveResponse.ok) {
-          const saveData = await saveResponse.json();
-          throw new Error(saveData.message || 'Failed to save blueprint');
-        }
-
-        await fetchUserBlueprints();
+      if (!saveResponse.ok) {
+        console.error('Failed to save blueprint');
       }
+
+      await fetchBlueprints();
     } catch (error) {
       console.error('Error:', error);
       setError(error.message || 'Failed to generate blueprint. Please try again.');
@@ -103,6 +175,35 @@ function App() {
       setIsGenerating(false);
     }
   };
+
+  const fetchBlueprints = async () => {
+    if (!authToken) return;
+
+    try {
+      const response = await fetch('http://localhost:5000/api/blueprints', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch blueprints');
+      }
+
+      const data = await response.json();
+      setSavedBlueprints(data);
+    } catch (error) {
+      console.error('Error fetching blueprints:', error);
+      setError('Failed to fetch saved blueprints');
+    }
+  };
+
+  // Fetch blueprints when user logs in
+  useEffect(() => {
+    if (user) {
+      fetchBlueprints();
+    }
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
@@ -264,7 +365,7 @@ function App() {
                 {isGenerating ? (
                   <div className="flex items-center justify-center h-full text-gray-400">
                     <div className="text-center">
-                      <svg className="mx-auto h-12 w-12 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <svg className="mx-auto h-12 w-12 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                       </svg>
@@ -289,37 +390,110 @@ function App() {
             </div>
 
             {/* Saved Blueprints Section */}
-            {user && savedBlueprints.length > 0 && (
-              <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">Saved Blueprints</h2>
-                <div className="space-y-4">
-                  {savedBlueprints.map((saved) => (
-                    <div
-                      key={saved._id}
-                      className="p-4 border border-gray-200 rounded-md hover:border-primary-200 hover:bg-gray-50 cursor-pointer transition-all duration-150"
-                      onClick={() => {
-                        setAppIdea(saved.ideaInput);
-                        setPlatform(saved.platform);
-                        setBlueprint(saved.generatedMarkdown);
-                      }}
-                    >
-                      <div className="font-medium text-gray-900">{saved.ideaInput}</div>
-                      <div className="mt-1 flex items-center text-sm text-gray-500 space-x-4">
-                        <span className="flex items-center">
-                          <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                          {saved.platform}
-                        </span>
-                        <span className="flex items-center">
-                          <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                          {new Date(saved.createdAt).toLocaleDateString()}
-                        </span>
-                      </div>
+            {user && (
+              <div className="mt-8">
+                <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Blueprints</h2>
+                  {savedBlueprints.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <p className="mt-2">No blueprints generated yet</p>
+                      <p className="text-sm">Your saved blueprints will appear here</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="space-y-4">
+                      {savedBlueprints.map((blueprint) => (
+                        <div
+                          key={blueprint._id}
+                          className="group relative bg-white rounded-lg border border-gray-200 p-4 hover:border-primary-300 hover:shadow-md transition-all duration-150"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h3 className="text-lg font-medium text-gray-900 mb-1 line-clamp-1">
+                                {blueprint.ideaInput}
+                              </h3>
+                              <div className="flex items-center space-x-4 text-sm text-gray-500">
+                                <span className="flex items-center">
+                                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                  </svg>
+                                  {blueprint.platform}
+                                </span>
+                                <span className="flex items-center">
+                                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                  </svg>
+                                  {new Date(blueprint.createdAt).toLocaleDateString()}
+                                </span>
+                                <span className="flex items-center">
+                                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                  {(blueprint.generatedMarkdown?.length || 0) > 1000 
+                                    ? `${Math.round(blueprint.generatedMarkdown.length / 1000)}K chars` 
+                                    : `${blueprint.generatedMarkdown?.length || 0} chars`}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => {
+                                  setAppIdea(blueprint.ideaInput);
+                                  setPlatform(blueprint.platform);
+                                  setBlueprint(blueprint.generatedMarkdown);
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                                className="text-primary-600 hover:text-primary-700 p-2 rounded-full hover:bg-primary-50 transition-colors duration-150"
+                                title="Load blueprint"
+                              >
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  const blob = new Blob([blueprint.generatedMarkdown], { type: 'text/markdown' });
+                                  const url = URL.createObjectURL(blob);
+                                  const a = document.createElement('a');
+                                  a.href = url;
+                                  a.download = `blueprint-${blueprint._id}.md`;
+                                  a.click();
+                                }}
+                                className="text-primary-600 hover:text-primary-700 p-2 rounded-full hover:bg-primary-50 transition-colors duration-150"
+                                title="Download markdown"
+                              >
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                </svg>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  navigator.clipboard.writeText(blueprint.generatedMarkdown);
+                                  // Show a toast or notification here
+                                }}
+                                className="text-primary-600 hover:text-primary-700 p-2 rounded-full hover:bg-primary-50 transition-colors duration-150"
+                                title="Copy to clipboard"
+                              >
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mt-2">
+                            <div className="relative">
+                              <div className="prose prose-sm max-w-none bg-gray-50 rounded p-3 line-clamp-3">
+                                <ReactMarkdown>{blueprint.generatedMarkdown}</ReactMarkdown>
+                              </div>
+                              <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-gray-50"></div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -332,10 +506,10 @@ function App() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full animate-fade-in">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Sign In</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Sign In or Register</h2>
               <button
                 onClick={() => setIsLoginModalOpen(false)}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -344,14 +518,14 @@ function App() {
             </div>
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                  Username
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                  Email
                 </label>
                 <input
-                  type="text"
-                  id="username"
-                  value={loginForm.username}
-                  onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                  type="email"
+                  id="email"
+                  value={loginForm.email}
+                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
                   required
                 />
@@ -369,12 +543,21 @@ function App() {
                   required
                 />
               </div>
-              <button
-                type="submit"
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-150"
-              >
-                Sign In
-              </button>
+              <div className="flex space-x-4">
+                <button
+                  type="submit"
+                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-150"
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRegister}
+                  className="flex-1 py-2 px-4 border border-primary-600 rounded-md shadow-sm text-sm font-medium text-primary-600 bg-white hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-150"
+                >
+                  Register
+                </button>
+              </div>
             </form>
           </div>
         </div>

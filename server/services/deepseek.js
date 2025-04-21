@@ -41,100 +41,111 @@ Please provide a comprehensive markdown document with the following sections:
 
 Please be specific, technical, and actionable in your response.`;
 
-    // Verify API key is present
-    if (!process.env.DEEPSEEK_API_KEY) {
+    // Get API key from environment
+    const apiKey = process.env.DEEPSEEK_API_KEY;
+    if (!apiKey) {
       throw new Error('DEEPSEEK_API_KEY is not set in environment variables');
     }
 
-    // First, get available models
-    const modelsResponse = await axios({
-      method: 'get',
-      url: 'https://openrouter.ai/api/v1/models',
-      headers: {
-        'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-        'HTTP-Referer': 'http://localhost:3000'
-      }
+    // Log environment check
+    console.log('Environment check:', {
+      hasApiKey: !!apiKey,
+      apiKeyStart: apiKey.substring(0, 10) + '...',
+      apiKeyLength: apiKey.length
     });
 
-    console.log('Available models:', modelsResponse.data);
-
-    const config = {
-      method: 'post',
+    // Make the API request
+    const response = await axios({
+      method: 'POST',
       url: 'https://openrouter.ai/api/v1/chat/completions',
       headers: {
-        'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`,
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'AppStruct Blueprint Generator',
-        'Content-Type': 'application/json'
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://github.com/codeium/AppStruct'
       },
       data: {
-        model: "mistralai/mistral-7b-instruct", // Fallback to Mistral as it's commonly available
-        messages: [{
-          role: "user",
-          content: prompt
-        }],
-        temperature: 0.7,
-        max_tokens: 2000
-      }
-    };
-
-    console.log('Making request to OpenRouter with config:', {
-      url: config.url,
-      model: config.data.model,
-      headers: {
-        ...config.headers,
-        'Authorization': 'Bearer ' + process.env.DEEPSEEK_API_KEY?.substring(0, 10) + '...'
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        max_tokens: 2000,
+        temperature: 0.7
       }
     });
 
-    const response = await axios(config);
+    // Log response info
+    console.log('Response info:', {
+      status: response.status,
+      statusText: response.statusText,
+      hasData: !!response.data,
+      dataKeys: Object.keys(response.data || {}),
+      firstChoice: response.data?.choices?.[0] ? {
+        hasMessage: !!response.data.choices[0].message,
+        messageKeys: Object.keys(response.data.choices[0].message || {}),
+        contentLength: response.data.choices[0].message?.content?.length
+      } : null
+    });
 
-    console.log('OpenRouter API Response Status:', response.status);
-    console.log('OpenRouter API Response Headers:', response.headers);
-    
-    if (response.data) {
-      console.log('OpenRouter API Response Data Structure:', {
-        hasChoices: !!response.data.choices,
-        choicesLength: response.data.choices?.length,
-        firstChoice: response.data.choices?.[0] ? 'present' : 'missing'
-      });
+    // Validate response structure
+    if (!response.data) {
+      throw new Error('No data received from OpenRouter API');
     }
 
-    if (!response.data?.choices?.[0]?.message?.content) {
-      console.error('Invalid response structure:', JSON.stringify(response.data, null, 2));
-      throw new Error('Invalid response structure from OpenRouter API');
+    if (!Array.isArray(response.data.choices)) {
+      throw new Error('Invalid response format: choices array is missing');
     }
 
-    return response.data.choices[0].message.content;
+    if (!response.data.choices.length) {
+      throw new Error('No completion choices received from OpenRouter API');
+    }
+
+    const firstChoice = response.data.choices[0];
+    if (!firstChoice.message || typeof firstChoice.message.content !== 'string') {
+      console.error('Unexpected response structure:', JSON.stringify(response.data, null, 2));
+      throw new Error('Invalid message format in API response');
+    }
+
+    return firstChoice.message.content;
   } catch (error) {
     // Log the complete error for debugging
-    console.error('Full error object:', error);
-    
-    console.error('OpenRouter API Error Details:', {
+    console.error('API Call Error:', {
       message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      headers: {
-        request: error.config?.headers,
-        response: error.response?.headers
+      code: error.code,
+      response: {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        headers: error.response?.headers
+      },
+      request: {
+        url: error.config?.url,
+        method: error.config?.method,
+        data: error.config?.data,
+        headers: {
+          ...error.config?.headers,
+          'Authorization': '[HIDDEN]'
+        }
       }
     });
 
-    if (error.response?.data?.error) {
-      throw new Error(`OpenRouter API Error: ${error.response.data.error.message || JSON.stringify(error.response.data.error)}`);
+    // Handle specific error cases
+    if (error.response?.status === 401) {
+      throw new Error('OpenRouter API authentication failed. Please check your API key.');
     }
 
-    // If it's a network error
-    if (error.code === 'ECONNREFUSED') {
+    if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
       throw new Error('Could not connect to OpenRouter API. Please check your internet connection.');
     }
 
-    // If it's an authentication error
-    if (error.response?.status === 401) {
-      throw new Error('Authentication failed. Please check your OpenRouter API key.');
+    if (error.response?.data?.error) {
+      const apiError = error.response.data.error;
+      throw new Error(`OpenRouter API Error: ${apiError.message || JSON.stringify(apiError)}`);
     }
 
+    // Generic error
     throw new Error(`OpenRouter API Error: ${error.message}`);
   }
 };
