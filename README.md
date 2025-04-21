@@ -1,5 +1,6 @@
 # AppStruct
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 AppStruct is a web application that helps users transform their app ideas into structured, developer-ready markdown blueprints.
 
@@ -58,3 +59,6 @@ Pull requests are welcome. For major changes, please open an issue first to disc
 =======
 Transform vague app ideas into structured, developer-ready blueprints
 >>>>>>> 785fd031e674a0b8881d123928b38fbd3928deba
+=======
+Transform vague app ideas into structured, developer-ready blueprints
+>>>>>>> 13f3df322915f30a7115ce81d8ab239df5be00e9
