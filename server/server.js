@@ -1,4 +1,15 @@
-require('dotenv').config();
+const path = require('path');
+const dotenv = require('dotenv');
+
+// Load environment variables from .env file
+const envPath = path.resolve(__dirname, '.env');
+const result = dotenv.config({ path: envPath });
+
+if (result.error) {
+  console.error('Error loading .env file:', result.error);
+  process.exit(1);
+}
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -16,12 +27,24 @@ console.log('Environment check:', {
   MONGODB_URI_exists: !!process.env.MONGODB_URI,
   PORT_exists: !!process.env.PORT,
   DEEPSEEK_API_KEY_exists: !!process.env.DEEPSEEK_API_KEY,
+  DEEPSEEK_API_KEY_start: process.env.DEEPSEEK_API_KEY ? `${process.env.DEEPSEEK_API_KEY.substring(0, 8)}...` : null,
   DEEPSEEK_API_KEY_length: process.env.DEEPSEEK_API_KEY?.length,
   JWT_SECRET_exists: !!process.env.JWT_SECRET,
   JWT_SECRET_length: process.env.JWT_SECRET?.length,
   current_dir: __dirname,
-  env_path: require('path').resolve(__dirname, '.env')
+  env_path: envPath,
+  env_loaded: !!result.parsed,
+  env_keys: result.parsed ? Object.keys(result.parsed) : []
 });
+
+// Verify required environment variables
+const requiredEnvVars = ['MONGODB_URI', 'PORT', 'DEEPSEEK_API_KEY', 'JWT_SECRET'];
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingVars.length > 0) {
+  console.error('Missing required environment variables:', missingVars);
+  process.exit(1);
+}
 
 // Middleware
 app.use(cors());
@@ -84,7 +107,13 @@ app.use('/api/auth', authRoutes);
 // Protected routes
 app.post('/api/generate', auth, async (req, res) => {
   try {
-    console.log('Received generate request:', req.body);
+    console.log('Generate request received:', {
+      body: req.body,
+      user: req.user?._id,
+      apiKeyExists: !!process.env.DEEPSEEK_API_KEY,
+      apiKeyStart: process.env.DEEPSEEK_API_KEY ? `${process.env.DEEPSEEK_API_KEY.substring(0, 8)}...` : null
+    });
+
     const { idea, platform } = req.body;
     
     if (!idea || !platform) {
@@ -103,7 +132,12 @@ app.post('/api/generate', auth, async (req, res) => {
     console.error('Generate API Error:', {
       message: error.message,
       stack: error.stack,
-      response: error.response?.data
+      response: error.response?.data,
+      envCheck: {
+        DEEPSEEK_API_KEY_exists: !!process.env.DEEPSEEK_API_KEY,
+        DEEPSEEK_API_KEY_start: process.env.DEEPSEEK_API_KEY ? `${process.env.DEEPSEEK_API_KEY.substring(0, 8)}...` : null,
+        DEEPSEEK_API_KEY_length: process.env.DEEPSEEK_API_KEY?.length
+      }
     });
 
     res.status(500).json({
@@ -114,7 +148,6 @@ app.post('/api/generate', auth, async (req, res) => {
   }
 });
 
-// Add error handling for auth routes
 app.post('/api/auth/register', async (req, res) => {
   try {
     console.log('Registration attempt:', {

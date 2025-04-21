@@ -115,62 +115,65 @@ function App() {
   };
 
   const generateBlueprint = async () => {
-    if (!appIdea.trim()) {
-      setError('Please enter an app idea');
-      return;
-    }
-
-    if (!authToken) {
-      setError('Please log in to generate blueprints');
-      setIsLoginModalOpen(true);
-      return;
-    }
-
-    setError(null);
-    setIsGenerating(true);
     try {
-      const generateResponse = await fetch('http://localhost:5000/api/generate', {
+      setIsGenerating(true);
+      setError(null);
+
+      const token = localStorage.getItem('authToken');
+      if (!token) {
+        setIsLoginModalOpen(true);
+        return;
+      }
+
+      if (!appIdea || !platform) {
+        setError('Please provide both an app idea and platform');
+        return;
+      }
+
+      const response = await fetch('http://localhost:5000/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           idea: appIdea,
-          platform
-        }),
+          platform: platform
+        })
       });
 
-      if (!generateResponse.ok) {
-        const errorData = await generateResponse.json();
+      if (!response.ok) {
+        const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to generate blueprint');
       }
 
-      const data = await generateResponse.json();
+      const data = await response.json();
       setBlueprint(data.markdown);
 
-      // Save blueprint
+      // Save the blueprint
       const saveResponse = await fetch('http://localhost:5000/api/blueprints', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           ideaInput: appIdea,
-          platform,
+          platform: platform,
           generatedMarkdown: data.markdown
-        }),
+        })
       });
 
       if (!saveResponse.ok) {
-        console.error('Failed to save blueprint');
+        console.error('Failed to save blueprint:', await saveResponse.text());
       }
 
-      await fetchBlueprints();
+      // Refresh blueprints list
+      fetchBlueprints();
+
     } catch (error) {
       console.error('Error:', error);
-      setError(error.message || 'Failed to generate blueprint. Please try again.');
+      setError(error.message);
     } finally {
       setIsGenerating(false);
     }
