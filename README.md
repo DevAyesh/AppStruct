@@ -53,12 +53,3 @@ npm start
 - **Layout**: Split-screen design for input and output
 - **UI Components**: Minimalist, modern components with subtle shadows and rounded corners
 
-## Contributing
-
-Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
-=======
-Transform vague app ideas into structured, developer-ready blueprints
->>>>>>> 785fd031e674a0b8881d123928b38fbd3928deba
-=======
-Transform vague app ideas into structured, developer-ready blueprints
->>>>>>> 13f3df322915f30a7115ce81d8ab239df5be00e9
