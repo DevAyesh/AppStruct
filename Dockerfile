@@ -17,7 +17,7 @@ ENV NODE_ENV=production
 COPY . .
 
 # Copy .env if present (optional, will not fail if missing)
-COPY .env e
+COPY .env .
 
 # Expose the port (change if your app uses a different port)
 EXPOSE 3000
