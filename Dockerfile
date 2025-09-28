@@ -35,7 +35,7 @@ COPY server/ ./
 COPY --from=build /usr/src/app/build ./public
 
 # Copy backend .env file
-COPY server/.env .env
+COPY .env .env
 
 # Expose the port (ensure this matches your server's port)
 EXPOSE 5000
