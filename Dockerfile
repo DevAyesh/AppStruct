@@ -1,5 +1,5 @@
 # Use official Node.js LTS image
-FROM node:18-alpine as build
+FROM node:18-alpine AS build
 
 # Set working directory
 WORKDIR /usr/src/app
@@ -35,7 +35,6 @@ COPY server/ ./
 COPY --from=build /usr/src/app/build ./public
 
 # Copy backend .env file
-
 
 # Expose the port (ensure this matches your server's port)
 EXPOSE 5000
