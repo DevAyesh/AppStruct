@@ -30,5 +30,5 @@ jobs:
           context: ./
           push: true
           tags: |
-            yourdockerhubusername/your-repo-name:${{ env.SHORT_SHA }}
-            yourdockerhubusername/your-repo-name:latest
+            mydockerhubusername/my-repo-name:${{ env.SHORT_SHA }}
+            mydockerhubusername/my-repo-name:latest
