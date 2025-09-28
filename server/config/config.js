@@ -39,6 +39,7 @@ try {
     console.error('Error reading .env file:', error);
 }
 
+// Use MONGODB_URI consistently
 const config = {
     mongodb: {
         uri: process.env.MONGODB_URI,
