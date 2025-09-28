@@ -1,4 +1,22 @@
 # Use official Node.js LTS image
+FROM node:18-alpine as build
+
+# Set working directory
+WORKDIR /usr/src/app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source files
+COPY . .
+
+# Build the React frontend
+RUN npm run build
+
+# Use a new stage for the production image
 FROM node:18-alpine
 
 # Set working directory
@@ -12,6 +30,9 @@ RUN npm ci --only=production
 
 # Copy backend source code
 COPY server/ ./
+
+# Copy built frontend files
+COPY --from=build /usr/src/app/build ./public
 
 # Copy backend .env file
 COPY server/.env .env
