@@ -47,18 +47,16 @@ if (missingVars.length > 0) {
 }
 
 // Middleware
-// Configure CORS with specific allowed origins
-const allowedOrigins = ['http://localhost:3000', 'https://your-production-domain.com'];
+// Configure CORS to allow all origins for testing purposes
 app.use(cors({
-  origin: function (origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  }
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+
+// Serve static files from the public directory
+app.use(express.static('public'));
 
 // Connect to MongoDB with detailed logging
 const connectDB = async () => {

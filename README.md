@@ -1,55 +1,100 @@
-# AppStruct
-<<<<<<< HEAD
-<<<<<<< HEAD
+# App Struct
 
-AppStruct is a web application that helps users transform their app ideas into structured, developer-ready markdown blueprints.
+## Project Structure
 
-## Features
-
-- Simple, intuitive interface for describing app ideas
-- Platform selection (web, mobile, or both)
-- Markdown blueprint generation
-- Basic user authentication
-- Blueprint storage with MongoDB Atlas
-- Blueprint download functionality
-
-## Tech Stack
-
-- React 18
-- Tailwind CSS
-- MongoDB Atlas (database)
-- React Markdown
-
-## Setup
-
-1. Install dependencies:
-```bash
-npm install
+```
+App Struct/
+├── build/
+│   ├── asset-manifest.json
+│   ├── index.html
+│   ├── manifest.json
+│   └── static/
+│       ├── css/
+│       │   ├── main.21759ff9.css
+│       │   └── main.21759ff9.css.map
+│       └── js/
+│           ├── main.6477bac7.js
+│           ├── main.6477bac7.js.LICENSE.txt
+│           └── main.6477bac7.js.map
+├── Dockerfile
+├── package-lock.json
+├── package.json
+├── public/
+│   ├── index.html
+│   └── manifest.json
+├── README.md
+├── server/
+│   ├── config/
+│   │   └── config.js
+│   ├── middleware/
+│   │   └── auth.js
+│   ├── models/
+│   │   ├── Blueprint.js
+│   │   └── User.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── routes/
+│   │   └── auth.js
+│   ├── server.js
+│   ├── services/
+│   │   └── deepseek.js
+│   ├── test.js
+│   └── verify-key.js
+├── src/
+│   ├── App.jsx
+│   ├── config/
+│   │   └── db.js
+│   ├── index.css
+│   ├── index.js
+│   └── models/
+│       └── Blueprint.js
+└── tailwind.config.js
 ```
 
-2. Create a `.env` file in the root directory with your MongoDB credentials:
-```
-REACT_APP_MONGODB_URI=your_mongodb_atlas_connection_string
-```
+## How to Run the App
 
-3. Start the development server:
-```bash
-npm start
-```
+### Prerequisites
 
-## Database Schema
+- Ensure you have Docker installed on your machine.
+- Make sure you have Node.js and npm installed if you plan to run the app without Docker.
 
-### Blueprint Collection
-- `userId`: String (required) - User's username
-- `ideaInput`: String (required) - Original app idea description
-- `platform`: String (required) - Selected platform (web/mobile/both)
-- `generatedMarkdown`: String (required) - Generated blueprint content
-- `createdAt`: Date - Timestamp of creation
+### Running with Docker
 
-## Design Choices
+1. **Build the Docker Image**:
+   ```bash
+   docker build -t app-struct .
+   ```
 
-- **Color Scheme**: Blue-based primary colors for trust and professionalism
-- **Typography**: Inter for general text, JetBrains Mono for code blocks
-- **Layout**: Split-screen design for input and output
-- **UI Components**: Minimalist, modern components with subtle shadows and rounded corners
+2. **Run the Docker Container**:
+   ```bash
+   docker run -p 5000:5000 app-struct
+   ```
+
+3. **Access the Application**:
+   - Open your browser and go to `http://localhost:5000`.
+
+### Running Locally
+
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   cd server && npm install
+   ```
+
+2. **Set Up Environment Variables**:
+   - Create a `.env` file in the `server` directory with the necessary environment variables.
+
+3. **Start the Server**:
+   ```bash
+   cd server
+   node server.js
+   ```
+
+4. **Start the Frontend**:
+   ```bash
+   npm start
+   ```
+
+5. **Access the Application**:
+   - Open your browser and go to `http://localhost:3000`.
 
