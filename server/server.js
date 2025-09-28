@@ -47,7 +47,17 @@ if (missingVars.length > 0) {
 }
 
 // Middleware
-app.use(cors());
+// Configure CORS with specific allowed origins
+const allowedOrigins = ['http://localhost:3000', 'https://your-production-domain.com'];
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
 app.use(express.json());
 
 // Connect to MongoDB with detailed logging
@@ -144,81 +154,6 @@ app.post('/api/generate', auth, async (req, res) => {
       error: true,
       message: error.message,
       details: error.response?.data
-    });
-  }
-});
-
-app.post('/api/auth/register', async (req, res) => {
-  try {
-    console.log('Registration attempt:', {
-      username: req.body.username,
-      email: req.body.email
-    });
-
-    const { username, email, password } = req.body;
-
-    // Validate input
-    if (!username || !email || !password) {
-      return res.status(400).json({
-        error: true,
-        message: 'Username, email and password are required'
-      });
-    }
-
-    // Check if user exists
-    const User = require('./models/User');
-    const existingUser = await User.findOne({
-      $or: [{ email }, { username }]
-    });
-
-    if (existingUser) {
-      console.log('User already exists:', {
-        email: existingUser.email,
-        username: existingUser.username
-      });
-      return res.status(400).json({
-        error: true,
-        message: 'User already exists'
-      });
-    }
-
-    // Create new user
-    const user = new User({ username, email, password });
-    await user.save();
-
-    console.log('User created successfully:', {
-      id: user._id,
-      username: user.username,
-      email: user.email
-    });
-
-    // Generate token
-    const jwt = require('jsonwebtoken');
-    const token = jwt.sign(
-      { userId: user._id },
-      config.jwt.secret,
-      { expiresIn: '7d' }
-    );
-
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    console.error('Registration error:', {
-      message: error.message,
-      stack: error.stack,
-      code: error.code
-    });
-
-    res.status(500).json({
-      error: true,
-      message: 'Error creating user',
-      details: error.message
     });
   }
 });
