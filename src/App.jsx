@@ -77,25 +77,45 @@ function App() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+    // #region agent log
+    const username = loginForm.email.split('@')[0];
+    fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:78',message:'handleRegister entry',data:{email:loginForm.email,username,passwordLength:loginForm.password?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     try {
+      const requestBody = {
+        username: username,
+        email: loginForm.email,
+        password: loginForm.password
+      };
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:86',message:'Before fetch request',data:{url:'http://localhost:5000/api/auth/register',requestBody:JSON.stringify(requestBody)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          username: loginForm.email.split('@')[0], // Use email prefix as username
-          email: loginForm.email,
-          password: loginForm.password
-        }),
+        body: JSON.stringify(requestBody),
       });
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:93',message:'Response received',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       const data = await response.json();
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:95',message:'Response data parsed',data:{hasError:data.error,message:data.message,hasToken:!!data.token,hasUser:!!data.user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
 
       if (!response.ok) {
-        throw new Error(data.error || 'Registration failed');
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:96',message:'Response not OK',data:{status:response.status,errorMessage:data.error||data.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
+        throw new Error(data.message || data.error || 'Registration failed');
       }
 
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:99',message:'Registration success',data:{hasToken:!!data.token,userId:data.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       // Auto-login after registration
       localStorage.setItem('authToken', data.token);
       setAuthToken(data.token);
@@ -103,6 +123,9 @@ function App() {
       setIsLoginModalOpen(false);
       setError(null);
     } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:106',message:'Registration catch error',data:{errorMessage:error.message,errorName:error.name,isNetworkError:error.message.includes('fetch')||error.message.includes('network')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       setError(error.message);
     }
   };
