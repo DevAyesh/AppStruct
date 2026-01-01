@@ -1,6 +1,7 @@
 {
   "short_name": "AppStruct",
-  "name": "AppStruct - App Blueprint Generator",
+  "name": "AppStruct - AI-Powered Blueprint Generator",
+  "description": "Transform your app ideas into detailed architectural blueprints with AI",
   "icons": [
     {
       "src": "favicon.ico",
@@ -10,6 +11,8 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#0ea5e9",
+  "background_color": "#f8fafc",
+  "orientation": "portrait-primary",
+  "categories": ["productivity", "developer tools", "design"]
 }

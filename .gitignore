@@ -14,7 +14,7 @@
 .env.local
 .env.development.local
 .env.test.local
-.env.production.local
+.env.production
 /server/.env
 
 # Logs
@@ -27,6 +27,8 @@ yarn-error.log*
 .vscode
 *.swp
 *.swo
+*.log
+*.cursor 
 
 # OS generated files
 .DS_Store

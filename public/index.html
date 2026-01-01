@@ -4,16 +4,62 @@
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="description" content="AppStruct - Transform app ideas into structured blueprints" />
+    <meta name="theme-color" content="#0ea5e9" />
+    <meta name="description" content="AppStruct - Transform your app ideas into detailed architectural blueprints powered by AI. Create professional blueprints for web and mobile apps instantly." />
+    <meta name="keywords" content="app blueprint, app design, architecture, AI, app development, blueprint generator" />
+    <meta property="og:title" content="AppStruct - AI-Powered Blueprint Generator" />
+    <meta property="og:description" content="Transform your app ideas into detailed architectural blueprints powered by AI" />
+    <meta property="og:type" content="website" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-    <title>AppStruct</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <title>AppStruct - AI Blueprint Generator</title>
+    <style>
+      /* Prevent flash of unstyled content */
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      }
+      /* Loading animation */
+      #loading {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f8fafc;
+        z-index: 9999;
+      }
+      #loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 4px solid #e2e8f0;
+        border-top-color: #0ea5e9;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="loading">
+      <div id="loading-spinner"></div>
+    </div>
     <div id="root"></div>
+    <script>
+      // Hide loading spinner when React loads
+      window.addEventListener('load', function() {
+        const loading = document.getElementById('loading');
+        if (loading) {
+          loading.style.opacity = '0';
+          setTimeout(() => loading.remove(), 300);
+        }
+      });
+    </script>
   </body>
 </html>
