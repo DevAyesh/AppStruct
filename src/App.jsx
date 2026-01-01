@@ -1,5 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { 
+  HiLightningBolt, 
+  HiLightBulb, 
+  HiDesktopComputer, 
+  HiDeviceMobile, 
+  HiCube,
+  HiDocumentText,
+  HiDownload,
+  HiFolder,
+  HiLogin,
+  HiLogout,
+  HiX,
+  HiMail,
+  HiLockClosed,
+  HiCheckCircle,
+  HiExclamationCircle,
+  HiClipboardCopy,
+  HiRefresh,
+  HiCalendar
+} from 'react-icons/hi';
 
 function App() {
   const [appIdea, setAppIdea] = useState('');
@@ -12,6 +32,14 @@ function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [authToken, setAuthToken] = useState(localStorage.getItem('authToken'));
+  const [toast, setToast] = useState(null);
+  const [isAuthMode, setIsAuthMode] = useState('login'); // 'login' or 'register'
+
+  // Toast notification helper
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   // Load token from localStorage on startup
   useEffect(() => {
@@ -70,63 +98,45 @@ function App() {
       setUser(data.user);
       setIsLoginModalOpen(false);
       setError(null);
+      showToast('Welcome back!', 'success');
     } catch (error) {
       setError(error.message);
+      showToast(error.message, 'error');
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    // #region agent log
-    const username = loginForm.email.split('@')[0];
-    fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:78',message:'handleRegister entry',data:{email:loginForm.email,username,passwordLength:loginForm.password?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
     try {
-      const requestBody = {
-        username: username,
-        email: loginForm.email,
-        password: loginForm.password
-      };
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:86',message:'Before fetch request',data:{url:'http://localhost:5000/api/auth/register',requestBody:JSON.stringify(requestBody)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
+      const username = loginForm.email.split('@')[0];
       const response = await fetch('http://localhost:5000/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          username: username,
+          email: loginForm.email,
+          password: loginForm.password
+        }),
       });
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:93',message:'Response received',data:{status:response.status,statusText:response.statusText,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       const data = await response.json();
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:95',message:'Response data parsed',data:{hasError:data.error,message:data.message,hasToken:!!data.token,hasUser:!!data.user},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
 
       if (!response.ok) {
-        // #region agent log
-        fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:96',message:'Response not OK',data:{status:response.status,errorMessage:data.error||data.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         throw new Error(data.message || data.error || 'Registration failed');
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:99',message:'Registration success',data:{hasToken:!!data.token,userId:data.user?.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       // Auto-login after registration
       localStorage.setItem('authToken', data.token);
       setAuthToken(data.token);
       setUser(data.user);
       setIsLoginModalOpen(false);
       setError(null);
+      showToast('Account created successfully!', 'success');
     } catch (error) {
-      // #region agent log
-      fetch('http://127.0.0.1:7243/ingest/f597ff93-d54e-4226-baba-0c5fa440c128',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.jsx:106',message:'Registration catch error',data:{errorMessage:error.message,errorName:error.name,isNetworkError:error.message.includes('fetch')||error.message.includes('network')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       setError(error.message);
+      showToast(error.message, 'error');
     }
   };
 
@@ -229,38 +239,75 @@ function App() {
     if (user) {
       fetchBlueprints();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gray-50">
+      {/* Subtle Background Pattern */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-slate-100 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+      </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 z-50 animate-slide-down ${
+          toast.type === 'error' ? 'bg-red-500' : 'bg-accent-600'
+        } text-white px-6 py-3 rounded-lg shadow-xl flex items-center space-x-3`}>
+          {toast.type === 'error' ? (
+            <HiExclamationCircle className="w-5 h-5" />
+          ) : (
+            <HiCheckCircle className="w-5 h-5" />
+          )}
+          <span className="font-medium">{toast.message}</span>
+        </div>
+      )}
+
       {/* Navigation */}
-      <nav className="bg-white shadow-sm sticky top-0 z-10">
+      <nav className="relative bg-white shadow-sm sticky top-0 z-40 border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <span className="text-2xl font-bold bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent">
-                AppStruct
-              </span>
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-accent-600 rounded-lg flex items-center justify-center shadow-md">
+                  <HiLightningBolt className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <span className="text-2xl font-bold text-gray-900">
+                    AppStruct
+                  </span>
+                  <p className="text-xs text-gray-500 font-medium -mt-1">Blueprint Generator</p>
+                </div>
+              </div>
             </div>
             <div className="flex items-center">
               {user ? (
                 <div className="flex items-center space-x-4">
-                  <span className="text-sm text-gray-600">
-                    Welcome, <span className="font-medium">{user.username}</span>
-                  </span>
+                  <div className="hidden sm:flex items-center space-x-3 bg-gray-100 px-4 py-2 rounded-lg">
+                    <div className="w-8 h-8 bg-accent-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">
+                      {user.username.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 font-medium">Welcome back</p>
+                      <p className="text-sm font-bold text-gray-800">{user.username}</p>
+                    </div>
+                  </div>
                   <button
                     onClick={handleLogout}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-150"
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-semibold rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 transition-colors duration-200"
                   >
+                    <HiLogout className="w-4 h-4 mr-2" />
                     Sign Out
                   </button>
                 </div>
               ) : (
                 <button
                   onClick={() => setIsLoginModalOpen(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-150"
+                  className="inline-flex items-center px-5 py-2.5 border border-transparent text-sm font-semibold rounded-lg text-white bg-accent-600 hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 transition-colors duration-200 shadow-sm"
                 >
-                  Sign In
+                  <HiLogin className="w-4 h-4 mr-2" />
+                  Get Started
                 </button>
               )}
             </div>
@@ -269,63 +316,108 @@ function App() {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
+      <main className="relative max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        {/* Hero Section */}
+        <div className="text-center mb-10">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-3">
+            Build Your App{' '}
+            <span className="text-accent-600">
+              Blueprint
+            </span>
+          </h1>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Transform your ideas into detailed architectural blueprints powered by AI
+          </p>
+        </div>
+
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-400 rounded-md shadow-sm animate-fade-in">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error</h3>
-                <div className="mt-2 text-sm text-red-700">{error}</div>
+          <div className="mb-6 max-w-2xl mx-auto">
+            <div className="bg-red-50 border-l-4 border-red-500 rounded-lg shadow-sm p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <HiExclamationCircle className="h-5 w-5 text-red-500" />
+                </div>
+                <div className="ml-3 flex-1">
+                  <h3 className="text-sm font-semibold text-red-900">Error</h3>
+                  <div className="mt-1 text-sm text-red-700">{error}</div>
+                </div>
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-4 text-red-400 hover:text-red-600 transition-colors"
+                >
+                  <HiX className="w-5 h-5" />
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Input Section */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Describe Your App Idea</h2>
-              <textarea
-                value={appIdea}
-                onChange={(e) => {
-                  setAppIdea(e.target.value);
-                  setError(null);
-                }}
-                rows={6}
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 transition-colors duration-150"
-                placeholder="Describe your app idea in plain language..."
-                disabled={isGenerating}
-              />
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center space-x-2 mb-4">
+                <HiLightBulb className="w-5 h-5 text-accent-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Describe Your Idea</h2>
+              </div>
+              <div className="relative">
+                <textarea
+                  value={appIdea}
+                  onChange={(e) => {
+                    setAppIdea(e.target.value);
+                    setError(null);
+                  }}
+                  rows={6}
+                  className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-accent-500 focus:ring-accent-500 transition-colors duration-200 text-gray-800 placeholder-gray-400"
+                  placeholder="e.g., A social media app for pet lovers with photo sharing, pet profiles, and a community forum..."
+                  disabled={isGenerating}
+                />
+                <div className="absolute bottom-3 right-3 text-xs text-gray-400 font-medium">
+                  {appIdea.length} characters
+                </div>
+              </div>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Target Platform</h2>
-              <div className="flex flex-wrap gap-4">
-                {['web', 'mobile', 'both'].map((option) => (
-                  <label key={option} className="flex-1 min-w-[120px]">
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow duration-200">
+              <div className="flex items-center space-x-2 mb-4">
+                <HiCube className="w-5 h-5 text-accent-600" />
+                <h2 className="text-lg font-semibold text-gray-900">Choose Platform</h2>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { value: 'web', icon: HiDesktopComputer, label: 'Web' },
+                  { value: 'mobile', icon: HiDeviceMobile, label: 'Mobile' },
+                  { value: 'both', icon: HiCube, label: 'Both' }
+                ].map((option) => (
+                  <label key={option.value} className="cursor-pointer">
+                    <input
+                      type="radio"
+                      name="platform"
+                      value={option.value}
+                      checked={platform === option.value}
+                      onChange={(e) => setPlatform(e.target.value)}
+                      className="sr-only"
+                      disabled={isGenerating}
+                    />
                     <div className={`
-                      flex items-center justify-center p-4 rounded-md border-2 cursor-pointer transition-all duration-150
-                      ${platform === option 
-                        ? 'border-primary-500 bg-primary-50 text-primary-700' 
-                        : 'border-gray-200 hover:border-primary-200'}
+                      relative rounded-lg border-2 transition-all duration-200
+                      ${platform === option.value 
+                        ? 'bg-accent-50 border-accent-500 shadow-sm' 
+                        : 'bg-white border-gray-200 hover:border-gray-300'}
                       ${isGenerating ? 'opacity-50 cursor-not-allowed' : ''}
+                      p-4 text-center
                     `}>
-                      <input
-                        type="radio"
-                        name="platform"
-                        value={option}
-                        checked={platform === option}
-                        onChange={(e) => setPlatform(e.target.value)}
-                        className="sr-only"
-                        disabled={isGenerating}
-                      />
-                      <span className="capitalize font-medium">{option}</span>
+                      <option.icon className={`w-8 h-8 mx-auto mb-2 ${
+                        platform === option.value ? 'text-accent-600' : 'text-gray-400'
+                      }`} />
+                      <span className={`font-semibold text-sm ${
+                        platform === option.value ? 'text-accent-900' : 'text-gray-700'
+                      }`}>
+                        {option.label}
+                      </span>
+                      {platform === option.value && (
+                        <HiCheckCircle className="absolute top-2 right-2 w-5 h-5 text-accent-600" />
+                      )}
                     </div>
                   </label>
                 ))}
@@ -335,35 +427,40 @@ function App() {
             <button
               onClick={generateBlueprint}
               className={`
-                w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium
-                transition-all duration-150 space-x-2
+                w-full flex justify-center items-center rounded-lg text-white font-semibold text-base py-3.5 px-6
+                transition-all duration-200 shadow-sm
                 ${isGenerating
-                  ? 'bg-primary-400 cursor-not-allowed'
-                  : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-accent-600 hover:bg-accent-700 hover:shadow-md'
                 }
-                text-white
               `}
               disabled={isGenerating || !appIdea.trim()}
             >
               {isGenerating ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-5 w-5 mr-3 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                  <span>Generating Blueprint...</span>
+                  <span>Generating...</span>
                 </>
               ) : (
-                'Generate Blueprint'
+                <>
+                  <HiLightningBolt className="w-5 h-5 mr-2" />
+                  <span>Generate Blueprint</span>
+                </>
               )}
             </button>
           </div>
 
           {/* Output Section */}
           <div className="space-y-6">
-            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
+            <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 hover:shadow-md transition-shadow duration-200">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-gray-900">Generated Blueprint</h2>
+                <div className="flex items-center space-x-2">
+                  <HiDocumentText className="w-5 h-5 text-accent-600" />
+                  <h2 className="text-lg font-semibold text-gray-900">Your Blueprint</h2>
+                </div>
                 {blueprint && (
                   <button
                     onClick={() => {
@@ -373,42 +470,49 @@ function App() {
                       a.href = url;
                       a.download = 'app-blueprint.md';
                       a.click();
+                      showToast('Blueprint downloaded!', 'success');
                     }}
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-primary-600 bg-primary-50 hover:bg-primary-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-150"
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-semibold rounded-lg text-white bg-accent-600 hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 transition-colors duration-200 shadow-sm"
                   >
-                    <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
+                    <HiDownload className="h-4 w-4 mr-1.5" />
                     Download
                   </button>
                 )}
               </div>
               <div className={`
-                prose max-w-none bg-gray-50 p-6 rounded-md border border-gray-200
+                relative prose prose-sm max-w-none bg-gray-50 p-5 rounded-lg border border-gray-200
                 ${isGenerating ? 'animate-pulse' : ''}
-                h-[600px] overflow-y-auto
+                h-[600px] overflow-y-auto custom-scrollbar
               `}>
                 {isGenerating ? (
-                  <div className="flex items-center justify-center h-full text-gray-400">
-                    <div className="text-center">
-                      <svg className="mx-auto h-12 w-12 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      <p className="mt-4 font-medium">Generating your blueprint...</p>
-                      <p className="mt-2 text-sm">This may take a few moments</p>
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center space-y-4">
+                      <div className="relative inline-block">
+                        <svg className="animate-spin h-16 w-16 text-accent-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold text-gray-800">Crafting Your Blueprint</p>
+                        <p className="mt-1 text-sm text-gray-500">This may take a few moments...</p>
+                      </div>
                     </div>
                   </div>
                 ) : blueprint ? (
                   <ReactMarkdown>{blueprint}</ReactMarkdown>
                 ) : (
-                  <div className="flex items-center justify-center h-full text-gray-400">
-                    <div className="text-center">
-                      <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <p className="mt-4 font-medium">Your blueprint will appear here</p>
-                      <p className="mt-2 text-sm">Enter your app idea and click generate</p>
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center space-y-4">
+                      <div className="w-20 h-20 mx-auto bg-gray-200 rounded-lg flex items-center justify-center">
+                        <HiDocumentText className="w-10 h-10 text-gray-400" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-semibold text-gray-800">Ready to Create</p>
+                        <p className="mt-1 text-sm text-gray-500 max-w-xs mx-auto">
+                          Enter your app idea above and click generate to see your blueprint here
+                        </p>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -416,110 +520,82 @@ function App() {
             </div>
 
             {/* Saved Blueprints Section */}
-            {user && (
-              <div className="mt-8">
+            {user && savedBlueprints.length > 0 && (
+              <div>
                 <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-                  <h2 className="text-xl font-semibold text-gray-900 mb-4">Your Blueprints</h2>
-                  {savedBlueprints.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <p className="mt-2">No blueprints generated yet</p>
-                      <p className="text-sm">Your saved blueprints will appear here</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {savedBlueprints.map((blueprint) => (
-                        <div
-                          key={blueprint._id}
-                          className="group relative bg-white rounded-lg border border-gray-200 p-4 hover:border-primary-300 hover:shadow-md transition-all duration-150"
-                        >
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h3 className="text-lg font-medium text-gray-900 mb-1 line-clamp-1">
-                                {blueprint.ideaInput}
-                              </h3>
-                              <div className="flex items-center space-x-4 text-sm text-gray-500">
-                                <span className="flex items-center">
-                                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                  </svg>
-                                  {blueprint.platform}
-                                </span>
-                                <span className="flex items-center">
-                                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                  </svg>
-                                  {new Date(blueprint.createdAt).toLocaleDateString()}
-                                </span>
-                                <span className="flex items-center">
-                                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                  </svg>
-                                  {(blueprint.generatedMarkdown?.length || 0) > 1000 
-                                    ? `${Math.round(blueprint.generatedMarkdown.length / 1000)}K chars` 
-                                    : `${blueprint.generatedMarkdown?.length || 0} chars`}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <button
-                                onClick={() => {
-                                  setAppIdea(blueprint.ideaInput);
-                                  setPlatform(blueprint.platform);
-                                  setBlueprint(blueprint.generatedMarkdown);
-                                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                                className="text-primary-600 hover:text-primary-700 p-2 rounded-full hover:bg-primary-50 transition-colors duration-150"
-                                title="Load blueprint"
-                              >
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  const blob = new Blob([blueprint.generatedMarkdown], { type: 'text/markdown' });
-                                  const url = URL.createObjectURL(blob);
-                                  const a = document.createElement('a');
-                                  a.href = url;
-                                  a.download = `blueprint-${blueprint._id}.md`;
-                                  a.click();
-                                }}
-                                className="text-primary-600 hover:text-primary-700 p-2 rounded-full hover:bg-primary-50 transition-colors duration-150"
-                                title="Download markdown"
-                              >
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                                </svg>
-                              </button>
-                              <button
-                                onClick={() => {
-                                  navigator.clipboard.writeText(blueprint.generatedMarkdown);
-                                  // Show a toast or notification here
-                                }}
-                                className="text-primary-600 hover:text-primary-700 p-2 rounded-full hover:bg-primary-50 transition-colors duration-150"
-                                title="Copy to clipboard"
-                              >
-                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                </svg>
-                              </button>
+                  <div className="flex items-center space-x-2 mb-4">
+                    <HiFolder className="w-5 h-5 text-accent-600" />
+                    <h2 className="text-lg font-semibold text-gray-900">Saved Blueprints</h2>
+                    <span className="px-2 py-1 bg-accent-100 text-accent-700 text-xs font-semibold rounded">
+                      {savedBlueprints.length}
+                    </span>
+                  </div>
+                  <div className="space-y-3 max-h-80 overflow-y-auto custom-scrollbar">
+                    {savedBlueprints.map((savedBlueprint) => (
+                      <div
+                        key={savedBlueprint._id}
+                        className="bg-gray-50 rounded-lg border border-gray-200 p-4 hover:border-accent-300 hover:shadow-sm transition-all duration-200"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex-1 pr-4">
+                            <h3 className="text-sm font-semibold text-gray-900 mb-2 line-clamp-2">
+                              {savedBlueprint.ideaInput}
+                            </h3>
+                            <div className="flex flex-wrap items-center gap-2 text-xs">
+                              <span className="inline-flex items-center px-2 py-1 bg-accent-100 text-accent-700 font-semibold rounded">
+                                <HiCube className="h-3 w-3 mr-1" />
+                                {savedBlueprint.platform}
+                              </span>
+                              <span className="inline-flex items-center text-gray-500">
+                                <HiCalendar className="h-3 w-3 mr-1" />
+                                {new Date(savedBlueprint.createdAt).toLocaleDateString()}
+                              </span>
                             </div>
                           </div>
-                          <div className="mt-2">
-                            <div className="relative">
-                              <div className="prose prose-sm max-w-none bg-gray-50 rounded p-3 line-clamp-3">
-                                <ReactMarkdown>{blueprint.generatedMarkdown}</ReactMarkdown>
-                              </div>
-                              <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-gray-50"></div>
-                            </div>
+                          <div className="flex items-center space-x-1">
+                            <button
+                              onClick={() => {
+                                setAppIdea(savedBlueprint.ideaInput);
+                                setPlatform(savedBlueprint.platform);
+                                setBlueprint(savedBlueprint.generatedMarkdown);
+                                window.scrollTo({ top: 0, behavior: 'smooth' });
+                                showToast('Blueprint loaded!', 'success');
+                              }}
+                              className="p-2 text-accent-600 hover:bg-accent-50 rounded-lg transition-colors"
+                              title="Load blueprint"
+                            >
+                              <HiRefresh className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const blob = new Blob([savedBlueprint.generatedMarkdown], { type: 'text/markdown' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `blueprint-${savedBlueprint._id}.md`;
+                                a.click();
+                                showToast('Blueprint downloaded!', 'success');
+                              }}
+                              className="p-2 text-accent-600 hover:bg-accent-50 rounded-lg transition-colors"
+                              title="Download"
+                            >
+                              <HiDownload className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(savedBlueprint.generatedMarkdown);
+                                showToast('Copied to clipboard!', 'success');
+                              }}
+                              className="p-2 text-accent-600 hover:bg-accent-50 rounded-lg transition-colors"
+                              title="Copy to clipboard"
+                            >
+                              <HiClipboardCopy className="h-4 w-4" />
+                            </button>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
@@ -527,63 +603,99 @@ function App() {
         </div>
       </main>
 
-      {/* Login Modal */}
+      {/* Login/Register Modal */}
       {isLoginModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full animate-fade-in">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">Sign In or Register</h2>
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl border border-gray-200">
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-accent-600 rounded-lg flex items-center justify-center">
+                  <HiLogin className="w-6 h-6 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">
+                  {isAuthMode === 'login' ? 'Welcome Back' : 'Create Account'}
+                </h2>
+              </div>
               <button
-                onClick={() => setIsLoginModalOpen(false)}
-                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                onClick={() => {
+                  setIsLoginModalOpen(false);
+                  setError(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 rounded-lg p-2 hover:bg-gray-100 transition-colors"
               >
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <HiX className="h-5 w-5" />
               </button>
             </div>
-            <form onSubmit={handleLogin} className="space-y-4">
+            
+            {/* Tab Switcher */}
+            <div className="flex space-x-2 mb-6 p-1 bg-gray-100 rounded-lg">
+              <button
+                onClick={() => setIsAuthMode('login')}
+                className={`flex-1 py-2.5 px-4 rounded-md font-semibold text-sm transition-all ${
+                  isAuthMode === 'login'
+                    ? 'bg-white text-accent-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => setIsAuthMode('register')}
+                className={`flex-1 py-2.5 px-4 rounded-md font-semibold text-sm transition-all ${
+                  isAuthMode === 'register'
+                    ? 'bg-white text-accent-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-800'
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            <form onSubmit={isAuthMode === 'login' ? handleLogin : handleRegister} className="space-y-4">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email
+                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                  Email Address
                 </label>
-                <input
-                  type="email"
-                  id="email"
-                  value={loginForm.email}
-                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                  required
-                />
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <HiMail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="email"
+                    id="email"
+                    value={loginForm.email}
+                    onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                    className="block w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 focus:border-accent-500 focus:ring-2 focus:ring-accent-200 transition-colors"
+                    placeholder="you@example.com"
+                    required
+                  />
+                </div>
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
                   Password
                 </label>
-                <input
-                  type="password"
-                  id="password"
-                  value={loginForm.password}
-                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                  required
-                />
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <HiLockClosed className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="password"
+                    id="password"
+                    value={loginForm.password}
+                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                    className="block w-full pl-10 pr-3 py-2.5 rounded-lg border border-gray-300 focus:border-accent-500 focus:ring-2 focus:ring-accent-200 transition-colors"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
               </div>
-              <div className="flex space-x-4">
-                <button
-                  type="submit"
-                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-150"
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRegister}
-                  className="flex-1 py-2 px-4 border border-primary-600 rounded-md shadow-sm text-sm font-medium text-primary-600 bg-white hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-150"
-                >
-                  Register
-                </button>
-              </div>
+              <button
+                type="submit"
+                className="w-full py-3 px-6 border border-transparent rounded-lg shadow-sm text-base font-semibold text-white bg-accent-600 hover:bg-accent-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 transition-colors"
+              >
+                {isAuthMode === 'login' ? 'Sign In' : 'Create Account'}
+              </button>
             </form>
           </div>
         </div>
