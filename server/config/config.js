@@ -6,14 +6,15 @@ console.log('Loading environment variables...');
 console.log('Current directory:', __dirname);
 console.log('Env file path:', path.resolve(__dirname, '../.env'));
 
-// Load environment variables from .env file
+// Load environment variables from .env file (optional in production)
 const result = dotenv.config({
     path: path.resolve(__dirname, '../.env')
 });
 
 if (result.error) {
-    console.error('Error loading .env file:', result.error);
-    process.exit(1);
+    console.warn('⚠️  No .env file found - using environment variables from hosting platform');
+} else {
+    console.log('✅ .env file loaded successfully');
 }
 
 // Debug loaded environment variables
@@ -25,7 +26,7 @@ console.log('Loaded environment variables:', {
     DEEPSEEK_API_KEY_exists: !!process.env.DEEPSEEK_API_KEY
 });
 
-// Read raw file content to check format
+// Read raw file content to check format (skip in production if file doesn't exist)
 const fs = require('fs');
 try {
     const envContent = fs.readFileSync(path.resolve(__dirname, '../.env'), 'utf8');
@@ -36,7 +37,7 @@ try {
         return line;
     }).join('\n'));
 } catch (error) {
-    console.error('Error reading .env file:', error);
+    console.log('⚠️  .env file not accessible (normal for production)');
 }
 
 // Use MONGODB_URI consistently

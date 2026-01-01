@@ -1,13 +1,15 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
-// Load environment variables from .env file
+// Load environment variables from .env file (optional in production)
 const envPath = path.resolve(__dirname, '.env');
 const result = dotenv.config({ path: envPath });
 
 if (result.error) {
-  console.error('Error loading .env file:', result.error);
-  process.exit(1);
+  console.warn('⚠️  No .env file found - using environment variables from hosting platform');
+  console.log('This is normal for production deployments (Railway, Render, etc.)');
+} else {
+  console.log('✅ .env file loaded successfully');
 }
 
 const express = require('express');
@@ -42,7 +44,9 @@ const requiredEnvVars = ['MONGODB_URI', 'PORT', 'DEEPSEEK_API_KEY', 'JWT_SECRET'
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
-  console.error('Missing required environment variables:', missingVars);
+  console.error('❌ Missing required environment variables:', missingVars);
+  console.error('📝 Please check your Railway/hosting platform environment variables');
+  console.error('Required variables:', requiredEnvVars.join(', '));
   process.exit(1);
 }
 
