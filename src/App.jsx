@@ -20,6 +20,7 @@ import {
   HiRefresh,
   HiCalendar
 } from 'react-icons/hi';
+import API_URL from './config/api';
 
 function App() {
   const [appIdea, setAppIdea] = useState('');
@@ -52,7 +53,7 @@ function App() {
 
   const fetchUserProfile = async (token) => {
     try {
-      const response = await fetch('http://localhost:5000/api/auth/me', {
+      const response = await fetch(`${API_URL}/api/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -75,7 +76,7 @@ function App() {
   const handleLogin = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/auth/login', {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -109,7 +110,7 @@ function App() {
     e.preventDefault();
     try {
       const username = loginForm.email.split('@')[0];
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,7 +164,7 @@ function App() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/generate', {
+      const response = await fetch(`${API_URL}/api/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -184,7 +185,7 @@ function App() {
       setBlueprint(data.markdown);
 
       // Save the blueprint
-      const saveResponse = await fetch('http://localhost:5000/api/blueprints', {
+      const saveResponse = await fetch(`${API_URL}/api/blueprints`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -216,7 +217,7 @@ function App() {
     if (!authToken) return;
 
     try {
-      const response = await fetch('http://localhost:5000/api/blueprints', {
+      const response = await fetch(`${API_URL}/api/blueprints`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
