@@ -184,6 +184,54 @@ app.post('/api/generate', auth, async (req, res) => {
   }
 });
 
+// Streaming endpoint for real-time blueprint generation
+app.post('/api/generate-stream', auth, async (req, res) => {
+  try {
+    console.log('Streaming generate request received:', {
+      body: req.body,
+      user: req.user?._id,
+    });
+
+    const { idea, platform, detailLevel } = req.body;
+    
+    if (!idea || !platform) {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Idea and platform are required' 
+      });
+    }
+
+    // Set headers for streaming
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Transfer-Encoding', 'chunked');
+    res.setHeader('Cache-Control', 'no-cache');
+
+    console.log('Calling Gemini API with streaming:', { idea, platform, detailLevel });
+    
+    // Call the streaming version of generateBlueprint
+    const { generateBlueprintStream } = require('./services/deepseek');
+    await generateBlueprintStream(idea, platform, detailLevel, (chunk) => {
+      res.write(chunk);
+    });
+    
+    res.end();
+  } catch (error) {
+    console.error('Streaming Generate API Error:', {
+      message: error.message,
+      stack: error.stack
+    });
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: true,
+        message: error.message
+      });
+    } else {
+      res.end();
+    }
+  }
+});
+
 app.post('/api/blueprints', auth, async (req, res) => {
   try {
     const blueprint = new Blueprint({
