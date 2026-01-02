@@ -119,6 +119,27 @@ app.use((req, res, next) => {
 // Routes
 app.use('/api/auth', authRoutes);
 
+// DNS test endpoint (for debugging)
+app.get('/api/dns-test', async (req, res) => {
+  const dns = require('dns').promises;
+  try {
+    const addresses = await dns.resolve4('api.openrouter.ai');
+    res.json({
+      success: true,
+      hostname: 'api.openrouter.ai',
+      addresses: addresses,
+      message: 'DNS resolution successful'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      code: error.code,
+      message: 'DNS resolution failed on Railway'
+    });
+  }
+});
+
 // Protected routes
 app.post('/api/generate', auth, async (req, res) => {
   try {
