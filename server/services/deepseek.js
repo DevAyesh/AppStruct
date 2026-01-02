@@ -1,10 +1,4 @@
-const axios = require('axios');
-const dns = require('dns').promises;
-const http = require('http');
-const https = require('https');
-
-// Force IPv4 resolution to avoid Railway DNS issues
-dns.setDefaultResultOrder('ipv4first');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 const generateBlueprint = async (idea, platform) => {
   try {
@@ -48,105 +42,84 @@ Please provide a comprehensive markdown document with the following sections:
 Please be specific, technical, and actionable in your response.`;
 
     // Get API key from environment
-    const apiKey = process.env.DEEPSEEK_API_KEY?.trim();
+    const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
-      throw new Error('DEEPSEEK_API_KEY is not set in environment variables');
+      throw new Error('GEMINI_API_KEY is not set in environment variables');
     }
 
     // Log API key format (safely)
-    console.log('DeepSeek API Key format check:', {
+    console.log('Gemini API Key format check:', {
       length: apiKey.length,
       firstChars: apiKey.substring(0, 10) + '...'
     });
 
-    // Create axios instance for DeepSeek API
-    const httpsAgent = new https.Agent({
-      family: 4, // Force IPv4
-      keepAlive: true,
-      timeout: 120000
-    });
-
-    const instance = axios.create({
-      baseURL: 'https://api.deepseek.com',
-      timeout: 120000,
-      httpsAgent: httpsAgent,
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+    // Initialize Gemini AI
+    const genAI = new GoogleGenerativeAI(apiKey);
+    
+    // Get the generative model
+    // Using gemini-1.5-flash for speed and cost-effectiveness
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      generationConfig: {
+        temperature: 0.7,
+        maxOutputTokens: 8000,
+        topP: 0.8,
+        topK: 40,
       }
     });
 
-    // Make the generation request to DeepSeek API
-    console.log('Making generation request to DeepSeek...');
-    const response = await instance.post('/chat/completions', {
-      model: "deepseek-chat",
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000
-    });
+    // Make the generation request to Gemini API
+    console.log('Making generation request to Gemini API...');
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
     // Log response info
-    console.log('DeepSeek API response:', {
-      status: response.status,
-      statusText: response.statusText,
-      hasData: !!response.data,
-      hasChoices: !!response.data?.choices
+    console.log('Gemini API response:', {
+      hasText: !!text,
+      textLength: text?.length || 0
     });
 
-    if (!response.data?.choices?.[0]?.message?.content) {
-      console.error('Invalid response structure:', JSON.stringify(response.data, null, 2));
-      throw new Error('Invalid response structure from DeepSeek API');
+    if (!text) {
+      console.error('Empty response from Gemini API');
+      throw new Error('Empty response from Gemini API');
     }
 
-    return response.data.choices[0].message.content;
+    console.log('Blueprint generated successfully!');
+    return text;
 
   } catch (error) {
     // Log error details
-    console.error('DeepSeek API Error:', {
+    console.error('Gemini API Error:', {
       name: error.name,
       message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      config: error.config ? {
-        url: error.config.url,
-        method: error.config.method,
-        headers: {
-          ...error.config.headers,
-          Authorization: '[HIDDEN]'
-        }
-      } : null
+      stack: error.stack
     });
 
     // Handle specific error cases
-    if (error.response?.status === 401) {
-      throw new Error(`DeepSeek API authentication failed: ${error.response.data?.error?.message || 'Invalid API key'}`);
+    if (error.message?.includes('API_KEY_INVALID') || error.message?.includes('API key not valid')) {
+      throw new Error('Gemini API authentication failed: Invalid API key');
     }
 
-    if (error.response?.status === 402) {
-      throw new Error('DeepSeek API quota exceeded. Please check your usage limits.');
+    if (error.message?.includes('quota') || error.message?.includes('RESOURCE_EXHAUSTED')) {
+      throw new Error('Gemini API quota exceeded. Please check your usage limits at aistudio.google.com');
     }
 
-    if (error.response?.status === 429) {
-      throw new Error('DeepSeek API rate limit exceeded. Please try again later.');
+    if (error.message?.includes('rate limit')) {
+      throw new Error('Gemini API rate limit exceeded. Please try again in a moment.');
     }
 
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-      throw new Error('Could not connect to DeepSeek API. Please check your network settings and try again.');
+      throw new Error('Could not connect to Gemini API. Please check your network settings and try again.');
     }
 
-    // Pass through API error messages if available
-    if (error.response?.data?.error) {
-      throw new Error(`DeepSeek API Error: ${error.response.data.error.message || JSON.stringify(error.response.data.error)}`);
+    // Pass through the error message
+    if (error.message) {
+      throw new Error(`Gemini API Error: ${error.message}`);
     }
 
     // Generic error
-    throw new Error(`DeepSeek API Error: ${error.message}`);
+    throw new Error('Gemini API Error: An unexpected error occurred');
   }
 };
 

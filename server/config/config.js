@@ -23,7 +23,7 @@ console.log('Loaded environment variables:', {
     PORT_exists: !!process.env.PORT,
     JWT_SECRET_exists: !!process.env.JWT_SECRET,
     JWT_SECRET_length: process.env.JWT_SECRET?.length,
-    DEEPSEEK_API_KEY_exists: !!process.env.DEEPSEEK_API_KEY
+    GEMINI_API_KEY_exists: !!process.env.GEMINI_API_KEY
 });
 
 // Read raw file content to check format (skip in production if file doesn't exist)
@@ -52,7 +52,7 @@ const config = {
         secret: process.env.JWT_SECRET,
     },
     api: {
-        deepseekKey: process.env.DEEPSEEK_API_KEY,
+        geminiKey: process.env.GEMINI_API_KEY,
     }
 };
 
@@ -62,13 +62,13 @@ const validateConfig = () => {
     const required = {
         'MongoDB URI': config.mongodb.uri,
         'JWT Secret': config.jwt.secret,
-        'DeepSeek API Key': config.api.deepseekKey
+        'Gemini API Key': config.api.geminiKey
     };
 
     console.log('Configuration values:', {
         'MongoDB URI': config.mongodb.uri ? 'Set' : 'Not set',
         'JWT Secret': config.jwt.secret ? `Set (length: ${config.jwt.secret.length})` : 'Not set',
-        'DeepSeek API Key': config.api.deepseekKey ? 'Set' : 'Not set'
+        'Gemini API Key': config.api.geminiKey ? 'Set' : 'Not set'
     });
 
     const missing = Object.entries(required)

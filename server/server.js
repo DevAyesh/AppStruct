@@ -28,9 +28,9 @@ console.log('Environment check:', {
   NODE_ENV: process.env.NODE_ENV,
   MONGODB_URI_exists: !!process.env.MONGODB_URI,
   PORT_exists: !!process.env.PORT,
-  DEEPSEEK_API_KEY_exists: !!process.env.DEEPSEEK_API_KEY,
-  DEEPSEEK_API_KEY_start: process.env.DEEPSEEK_API_KEY ? `${process.env.DEEPSEEK_API_KEY.substring(0, 8)}...` : null,
-  DEEPSEEK_API_KEY_length: process.env.DEEPSEEK_API_KEY?.length,
+  GEMINI_API_KEY_exists: !!process.env.GEMINI_API_KEY,
+  GEMINI_API_KEY_start: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 8)}...` : null,
+  GEMINI_API_KEY_length: process.env.GEMINI_API_KEY?.length,
   JWT_SECRET_exists: !!process.env.JWT_SECRET,
   JWT_SECRET_length: process.env.JWT_SECRET?.length,
   current_dir: __dirname,
@@ -40,7 +40,7 @@ console.log('Environment check:', {
 });
 
 // Verify required environment variables
-const requiredEnvVars = ['MONGODB_URI', 'PORT', 'DEEPSEEK_API_KEY', 'JWT_SECRET'];
+const requiredEnvVars = ['MONGODB_URI', 'PORT', 'GEMINI_API_KEY', 'JWT_SECRET'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
@@ -146,8 +146,8 @@ app.post('/api/generate', auth, async (req, res) => {
     console.log('Generate request received:', {
       body: req.body,
       user: req.user?._id,
-      apiKeyExists: !!process.env.DEEPSEEK_API_KEY,
-      apiKeyStart: process.env.DEEPSEEK_API_KEY ? `${process.env.DEEPSEEK_API_KEY.substring(0, 8)}...` : null
+      apiKeyExists: !!process.env.GEMINI_API_KEY,
+      apiKeyStart: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 8)}...` : null
     });
 
     const { idea, platform } = req.body;
@@ -159,7 +159,7 @@ app.post('/api/generate', auth, async (req, res) => {
       });
     }
 
-    console.log('Calling OpenRouter API with:', { idea, platform });
+    console.log('Calling Gemini API with:', { idea, platform });
     const markdown = await generateBlueprint(idea, platform);
     console.log('Generated markdown length:', markdown?.length || 0);
     
@@ -170,9 +170,9 @@ app.post('/api/generate', auth, async (req, res) => {
       stack: error.stack,
       response: error.response?.data,
       envCheck: {
-        DEEPSEEK_API_KEY_exists: !!process.env.DEEPSEEK_API_KEY,
-        DEEPSEEK_API_KEY_start: process.env.DEEPSEEK_API_KEY ? `${process.env.DEEPSEEK_API_KEY.substring(0, 8)}...` : null,
-        DEEPSEEK_API_KEY_length: process.env.DEEPSEEK_API_KEY?.length
+        GEMINI_API_KEY_exists: !!process.env.GEMINI_API_KEY,
+        GEMINI_API_KEY_start: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 8)}...` : null,
+        GEMINI_API_KEY_length: process.env.GEMINI_API_KEY?.length
       }
     });
 
