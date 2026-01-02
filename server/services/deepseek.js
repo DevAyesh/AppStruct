@@ -54,13 +54,12 @@ Please be specific, technical, and actionable in your response.`;
     }
 
     // Log API key format (safely)
-    console.log('API Key format check:', {
-      startsWithPrefix: apiKey.startsWith('sk-or-v1-'),
+    console.log('DeepSeek API Key format check:', {
       length: apiKey.length,
-      firstChars: apiKey.substring(0, 8) + '...'
+      firstChars: apiKey.substring(0, 10) + '...'
     });
 
-    // Create axios instance with default config and custom DNS agent
+    // Create axios instance for DeepSeek API
     const httpsAgent = new https.Agent({
       family: 4, // Force IPv4
       keepAlive: true,
@@ -68,35 +67,19 @@ Please be specific, technical, and actionable in your response.`;
     });
 
     const instance = axios.create({
-      baseURL: 'https://api.openrouter.ai/api/v1',
+      baseURL: 'https://api.deepseek.com',
       timeout: 120000,
       httpsAgent: httpsAgent,
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://github.com/codeium/AppStruct',
-        'Content-Type': 'application/json',
-        'X-Title': 'AppStruct',
-        'User-Agent': 'AppStruct/1.0.0'
+        'Content-Type': 'application/json'
       }
     });
 
-    // First verify the API key
-    console.log('Verifying API key...');
-    try {
-      const authCheck = await instance.get('/auth/key');
-      console.log('API key verification:', authCheck.data);
-    } catch (authError) {
-      console.error('API key verification failed:', {
-        status: authError.response?.status,
-        message: authError.response?.data?.error?.message
-      });
-      throw new Error(`API key verification failed: ${authError.response?.data?.error?.message || authError.message}`);
-    }
-
-    // Make the generation request
-    console.log('Making generation request...');
+    // Make the generation request to DeepSeek API
+    console.log('Making generation request to DeepSeek...');
     const response = await instance.post('/chat/completions', {
-      model: "gpt-3.5-turbo",
+      model: "deepseek-chat",
       messages: [
         {
           role: "user",
@@ -108,7 +91,7 @@ Please be specific, technical, and actionable in your response.`;
     });
 
     // Log response info
-    console.log('OpenRouter API response:', {
+    console.log('DeepSeek API response:', {
       status: response.status,
       statusText: response.statusText,
       hasData: !!response.data,
@@ -117,14 +100,14 @@ Please be specific, technical, and actionable in your response.`;
 
     if (!response.data?.choices?.[0]?.message?.content) {
       console.error('Invalid response structure:', JSON.stringify(response.data, null, 2));
-      throw new Error('Invalid response structure from OpenRouter API');
+      throw new Error('Invalid response structure from DeepSeek API');
     }
 
     return response.data.choices[0].message.content;
 
   } catch (error) {
     // Log error details
-    console.error('OpenRouter API Error:', {
+    console.error('DeepSeek API Error:', {
       name: error.name,
       message: error.message,
       status: error.response?.status,
@@ -142,28 +125,28 @@ Please be specific, technical, and actionable in your response.`;
 
     // Handle specific error cases
     if (error.response?.status === 401) {
-      throw new Error(`OpenRouter API authentication failed: ${error.response.data?.error?.message || 'Invalid API key'}`);
+      throw new Error(`DeepSeek API authentication failed: ${error.response.data?.error?.message || 'Invalid API key'}`);
     }
 
     if (error.response?.status === 402) {
-      throw new Error('OpenRouter API quota exceeded. Please check your usage limits.');
+      throw new Error('DeepSeek API quota exceeded. Please check your usage limits.');
     }
 
     if (error.response?.status === 429) {
-      throw new Error('OpenRouter API rate limit exceeded. Please try again later.');
+      throw new Error('DeepSeek API rate limit exceeded. Please try again later.');
     }
 
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-      throw new Error('Could not connect to OpenRouter API. Please check your network settings and try again.');
+      throw new Error('Could not connect to DeepSeek API. Please check your network settings and try again.');
     }
 
     // Pass through API error messages if available
     if (error.response?.data?.error) {
-      throw new Error(`OpenRouter API Error: ${error.response.data.error.message || JSON.stringify(error.response.data.error)}`);
+      throw new Error(`DeepSeek API Error: ${error.response.data.error.message || JSON.stringify(error.response.data.error)}`);
     }
 
     // Generic error
-    throw new Error(`OpenRouter API Error: ${error.message}`);
+    throw new Error(`DeepSeek API Error: ${error.message}`);
   }
 };
 
