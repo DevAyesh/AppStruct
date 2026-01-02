@@ -1,5 +1,7 @@
 const axios = require('axios');
-const dns = require('dns');
+const dns = require('dns').promises;
+const http = require('http');
+const https = require('https');
 
 // Force IPv4 resolution to avoid Railway DNS issues
 dns.setDefaultResultOrder('ipv4first');
@@ -58,29 +60,23 @@ Please be specific, technical, and actionable in your response.`;
       firstChars: apiKey.substring(0, 8) + '...'
     });
 
-    // Create axios instance with default config and DNS resolution
+    // Create axios instance with default config and custom DNS agent
+    const httpsAgent = new https.Agent({
+      family: 4, // Force IPv4
+      keepAlive: true,
+      timeout: 120000
+    });
+
     const instance = axios.create({
       baseURL: 'https://api.openrouter.ai/api/v1',
-      timeout: 120000, // Increased timeout for Railway
+      timeout: 120000,
+      httpsAgent: httpsAgent,
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'HTTP-Referer': 'https://github.com/codeium/AppStruct',
         'Content-Type': 'application/json',
         'X-Title': 'AppStruct',
         'User-Agent': 'AppStruct/1.0.0'
-      },
-      // Add DNS resolution options
-      family: 4, // Force IPv4
-      lookup: (hostname, options, callback) => {
-        dns.resolve4(hostname, (err, addresses) => {
-          if (err) {
-            console.error('DNS resolution error:', err);
-            callback(err, null);
-          } else {
-            console.log(`Resolved ${hostname} to ${addresses[0]}`);
-            callback(null, addresses[0], 4);
-          }
-        });
       }
     });
 
