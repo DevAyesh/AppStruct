@@ -41,14 +41,12 @@ const auth = async (req, res, next) => {
   } catch (error) {
     console.error('Authentication error:', {
       message: error.message,
-      name: error.name,
-      stack: error.stack
+      name: error.name
     });
 
     res.status(401).json({ 
       error: true,
-      message: 'Please authenticate',
-      details: error.message
+      message: 'Please authenticate'
     });
   }
 };

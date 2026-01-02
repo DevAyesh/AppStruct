@@ -15,6 +15,8 @@ if (result.error) {
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const config = require('./config/config');
 const authRoutes = require('./routes/auth');
 const Blueprint = require('./models/Blueprint');
@@ -23,20 +25,16 @@ const auth = require('./middleware/auth');
 
 const app = express();
 
-// Debug environment variables
+// Debug environment variables (without exposing sensitive data)
 console.log('Environment check:', {
   NODE_ENV: process.env.NODE_ENV,
   MONGODB_URI_exists: !!process.env.MONGODB_URI,
   PORT_exists: !!process.env.PORT,
   GEMINI_API_KEY_exists: !!process.env.GEMINI_API_KEY,
-  GEMINI_API_KEY_start: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 8)}...` : null,
-  GEMINI_API_KEY_length: process.env.GEMINI_API_KEY?.length,
   JWT_SECRET_exists: !!process.env.JWT_SECRET,
-  JWT_SECRET_length: process.env.JWT_SECRET?.length,
   current_dir: __dirname,
   env_path: envPath,
-  env_loaded: !!result.parsed,
-  env_keys: result.parsed ? Object.keys(result.parsed) : []
+  env_loaded: !!result.parsed
 });
 
 // Verify required environment variables
@@ -51,16 +49,66 @@ if (missingVars.length > 0) {
 }
 
 // Middleware
-// Configure CORS to allow all origins for testing purposes
+// Security headers with helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable for API server
+  crossOriginEmbedderPolicy: false
+}));
+
+// Configure CORS with secure defaults
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [
+      process.env.FRONTEND_URL,
+      /\.vercel\.app$/,
+      /\.railway\.app$/
+    ].filter(Boolean)
+  : ['http://localhost:3000', 'http://localhost:3001'];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL || 'https://vercel.app', /\.vercel\.app$/]
-    : '*',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, postman)
+    if (!origin) return callback(null, true);
+    
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') return allowed === origin;
+      if (allowed instanceof RegExp) return allowed.test(origin);
+      return false;
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.warn('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  maxAge: 86400 // 24 hours
 }));
 app.use(express.json());
+
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: { error: true, message: 'Too many requests from this IP, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limiting for generation endpoints
+const generateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Limit each IP to 10 generation requests per 15 minutes
+  message: { error: true, message: 'Too many generation requests. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply general rate limiting to all API routes
+app.use('/api/', apiLimiter);
 
 // Serve static files from the public directory
 app.use(express.static('public'));
@@ -141,21 +189,50 @@ app.get('/api/dns-test', async (req, res) => {
 });
 
 // Protected routes
-app.post('/api/generate', auth, async (req, res) => {
+app.post('/api/generate', generateLimiter, auth, async (req, res) => {
   try {
     console.log('Generate request received:', {
-      body: req.body,
       user: req.user?._id,
-      apiKeyExists: !!process.env.GEMINI_API_KEY,
-      apiKeyStart: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 8)}...` : null
+      platform: req.body.platform,
+      ideaLength: req.body.idea?.length || 0
     });
 
     const { idea, platform } = req.body;
     
+    // Input validation
     if (!idea || !platform) {
       return res.status(400).json({ 
         error: true,
         message: 'Idea and platform are required' 
+      });
+    }
+
+    if (typeof idea !== 'string' || typeof platform !== 'string') {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Invalid input types' 
+      });
+    }
+
+    if (idea.trim().length < 10) {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Idea must be at least 10 characters long' 
+      });
+    }
+
+    if (idea.length > 5000) {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Idea is too long (maximum 5000 characters)' 
+      });
+    }
+
+    const validPlatforms = ['web', 'mobile', 'both'];
+    if (!validPlatforms.includes(platform.toLowerCase())) {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Invalid platform. Must be one of: web, mobile, both' 
       });
     }
 
@@ -167,13 +244,7 @@ app.post('/api/generate', auth, async (req, res) => {
   } catch (error) {
     console.error('Generate API Error:', {
       message: error.message,
-      stack: error.stack,
-      response: error.response?.data,
-      envCheck: {
-        GEMINI_API_KEY_exists: !!process.env.GEMINI_API_KEY,
-        GEMINI_API_KEY_start: process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.substring(0, 8)}...` : null,
-        GEMINI_API_KEY_length: process.env.GEMINI_API_KEY?.length
-      }
+      user: req.user?._id
     });
 
     res.status(500).json({
@@ -185,19 +256,58 @@ app.post('/api/generate', auth, async (req, res) => {
 });
 
 // Streaming endpoint for real-time blueprint generation
-app.post('/api/generate-stream', auth, async (req, res) => {
+app.post('/api/generate-stream', generateLimiter, auth, async (req, res) => {
   try {
     console.log('Streaming generate request received:', {
-      body: req.body,
       user: req.user?._id,
+      platform: req.body.platform,
+      detailLevel: req.body.detailLevel,
+      ideaLength: req.body.idea?.length || 0
     });
 
     const { idea, platform, detailLevel } = req.body;
     
+    // Input validation
     if (!idea || !platform) {
       return res.status(400).json({ 
         error: true,
         message: 'Idea and platform are required' 
+      });
+    }
+
+    if (typeof idea !== 'string' || typeof platform !== 'string') {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Invalid input types' 
+      });
+    }
+
+    if (idea.trim().length < 10) {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Idea must be at least 10 characters long' 
+      });
+    }
+
+    if (idea.length > 5000) {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Idea is too long (maximum 5000 characters)' 
+      });
+    }
+
+    const validPlatforms = ['web', 'mobile', 'both'];
+    if (!validPlatforms.includes(platform.toLowerCase())) {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Invalid platform. Must be one of: web, mobile, both' 
+      });
+    }
+
+    if (detailLevel && !['brief', 'full'].includes(detailLevel)) {
+      return res.status(400).json({ 
+        error: true,
+        message: 'Invalid detail level. Must be one of: brief, full' 
       });
     }
 

@@ -1,26 +1,97 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const config = require('../config/config');
 
 const router = express.Router();
 
+// Rate limiter for auth endpoints to prevent brute force attacks
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per 15 minutes
+  message: { error: true, message: 'Too many authentication attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Validation helper functions
+const isValidEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const isStrongPassword = (password) => {
+  // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+  return passwordRegex.test(password);
+};
+
+const sanitizeInput = (input) => {
+  if (typeof input !== 'string') return input;
+  // Remove potential XSS characters
+  return input.replace(/[<>]/g, '');
+};
+
 // Register new user
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   try {
     console.log('Registration attempt:', {
       username: req.body.username,
       email: req.body.email
     });
 
-    const { username, email, password } = req.body;
+    let { username, email, password } = req.body;
 
     // Validate input
     if (!username || !email || !password) {
       return res.status(400).json({
         error: true,
         message: 'Username, email and password are required'
+      });
+    }
+
+    // Type validation
+    if (typeof username !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({
+        error: true,
+        message: 'Invalid input types'
+      });
+    }
+
+    // Sanitize inputs
+    username = sanitizeInput(username.trim());
+    email = email.trim().toLowerCase();
+
+    // Validate email format
+    if (!isValidEmail(email)) {
+      return res.status(400).json({
+        error: true,
+        message: 'Invalid email format'
+      });
+    }
+
+    // Validate username length and format
+    if (username.length < 3 || username.length > 30) {
+      return res.status(400).json({
+        error: true,
+        message: 'Username must be between 3 and 30 characters'
+      });
+    }
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+      return res.status(400).json({
+        error: true,
+        message: 'Username can only contain letters, numbers, hyphens, and underscores'
+      });
+    }
+
+    // Validate password strength
+    if (!isStrongPassword(password)) {
+      return res.status(400).json({
+        error: true,
+        message: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number'
       });
     }
 
@@ -72,19 +143,17 @@ router.post('/register', async (req, res) => {
   } catch (error) {
     console.error('Registration error:', {
       message: error.message,
-      stack: error.stack,
       code: error.code
     });
     res.status(500).json({
       error: true,
-      message: 'Error creating user',
-      details: error.message
+      message: 'Error creating user'
     });
   }
 });
 
 // Login user
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   try {
     console.log('Login attempt:', {
       email: req.body.email
@@ -92,8 +161,23 @@ router.post('/login', async (req, res) => {
 
     const { email, password } = req.body;
 
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        error: true,
+        message: 'Email and password are required'
+      });
+    }
+
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({
+        error: true,
+        message: 'Invalid input types'
+      });
+    }
+
     // Find user
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.trim().toLowerCase() });
     if (!user) {
       return res.status(401).json({
         error: true,

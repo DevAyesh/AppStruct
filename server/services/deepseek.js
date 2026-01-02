@@ -84,12 +84,6 @@ const generateBlueprint = async (idea, platform, detailLevel = 'full') => {
       throw new Error('GEMINI_API_KEY is not set in environment variables');
     }
 
-    // Log API key format (safely)
-    console.log('Gemini API Key format check:', {
-      length: apiKey.length,
-      firstChars: apiKey.substring(0, 10) + '...'
-    });
-
     // Initialize Gemini AI
     const genAI = new GoogleGenerativeAI(apiKey);
     
@@ -129,8 +123,7 @@ const generateBlueprint = async (idea, platform, detailLevel = 'full') => {
     // Log error details
     console.error('Gemini API Error:', {
       name: error.name,
-      message: error.message,
-      stack: error.stack
+      message: error.message
     });
 
     // Handle specific error cases
@@ -202,8 +195,7 @@ const generateBlueprintStream = async (idea, platform, detailLevel = 'full', onC
     // Log error details
     console.error('Gemini Streaming API Error:', {
       name: error.name,
-      message: error.message,
-      stack: error.stack
+      message: error.message
     });
 
     // Handle specific error cases

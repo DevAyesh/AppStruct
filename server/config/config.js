@@ -17,12 +17,11 @@ if (result.error) {
     console.log('✅ .env file loaded successfully');
 }
 
-// Debug loaded environment variables
+// Debug loaded environment variables (without exposing sensitive data)
 console.log('Loaded environment variables:', {
     MONGODB_URI_exists: !!process.env.MONGODB_URI,
     PORT_exists: !!process.env.PORT,
     JWT_SECRET_exists: !!process.env.JWT_SECRET,
-    JWT_SECRET_length: process.env.JWT_SECRET?.length,
     GEMINI_API_KEY_exists: !!process.env.GEMINI_API_KEY
 });
 
@@ -67,14 +66,14 @@ const validateConfig = () => {
 
     console.log('Configuration values:', {
         'MongoDB URI': config.mongodb.uri ? 'Set' : 'Not set',
-        'JWT Secret': config.jwt.secret ? `Set (length: ${config.jwt.secret.length})` : 'Not set',
+        'JWT Secret': config.jwt.secret ? 'Set' : 'Not set',
         'Gemini API Key': config.api.geminiKey ? 'Set' : 'Not set'
     });
 
     const missing = Object.entries(required)
         .filter(([key, value]) => {
             const isMissing = !value;
-            console.log(`Checking ${key}:`, { exists: !!value, length: value?.length });
+            console.log(`Checking ${key}:`, { exists: !!value });
             return isMissing;
         })
         .map(([key]) => key);
