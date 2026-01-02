@@ -1,5 +1,0 @@
-{"location":"App.jsx:78","message":"handleRegister entry","data":{"email":"test@example.com","username":"test","passwordLength":6},"timestamp":1767284963280,"sessionId":"debug-session","runId":"run1","hypothesisId":"B"}
-{"location":"App.jsx:86","message":"Before fetch request","data":{"url":"http://localhost:5000/api/auth/register","requestBody":"{\"username\":\"test\",\"email\":\"test@example.com\",\"password\":\"111111\"}"},"timestamp":1767284963281,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"App.jsx:93","message":"Response received","data":{"status":201,"statusText":"Created","ok":true},"timestamp":1767284963748,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
-{"location":"App.jsx:95","message":"Response data parsed","data":{"hasToken":true,"hasUser":true},"timestamp":1767284963748,"sessionId":"debug-session","runId":"run1","hypothesisId":"E"}
-{"location":"App.jsx:99","message":"Registration success","data":{"hasToken":true,"userId":"6956a0e30dfccd61538e9289"},"timestamp":1767284963748,"sessionId":"debug-session","runId":"run1","hypothesisId":"A"}
