@@ -17,26 +17,14 @@ if (result.error) {
     console.log('✅ .env file loaded successfully');
 }
 
-// Debug loaded environment variables (without exposing sensitive data)
-console.log('Loaded environment variables:', {
-    MONGODB_URI_exists: !!process.env.MONGODB_URI,
-    PORT_exists: !!process.env.PORT,
-    JWT_SECRET_exists: !!process.env.JWT_SECRET,
-    GEMINI_API_KEY_exists: !!process.env.GEMINI_API_KEY
-});
-
-// Read raw file content to check format (skip in production if file doesn't exist)
-const fs = require('fs');
-try {
-    const envContent = fs.readFileSync(path.resolve(__dirname, '../.env'), 'utf8');
-    console.log('Raw .env file content:', envContent.split('\n').map(line => {
-        if (line.toLowerCase().includes('secret') || line.toLowerCase().includes('key')) {
-            return line.replace(/=.*/, '=<HIDDEN>');
-        }
-        return line;
-    }).join('\n'));
-} catch (error) {
-    console.log('⚠️  .env file not accessible (normal for production)');
+// Debug loaded environment variables (only in development)
+if (process.env.NODE_ENV !== 'production') {
+    console.log('Loaded environment variables:', {
+        MONGODB_URI_exists: !!process.env.MONGODB_URI,
+        PORT_exists: !!process.env.PORT,
+        JWT_SECRET_exists: !!process.env.JWT_SECRET,
+        GEMINI_API_KEY_exists: !!process.env.GEMINI_API_KEY
+    });
 }
 
 // Use MONGODB_URI consistently
@@ -57,30 +45,23 @@ const config = {
 
 // Validate required configuration
 const validateConfig = () => {
-    console.log('Validating configuration...');
     const required = {
         'MongoDB URI': config.mongodb.uri,
         'JWT Secret': config.jwt.secret,
         'Gemini API Key': config.api.geminiKey
     };
 
-    console.log('Configuration values:', {
-        'MongoDB URI': config.mongodb.uri ? 'Set' : 'Not set',
-        'JWT Secret': config.jwt.secret ? 'Set' : 'Not set',
-        'Gemini API Key': config.api.geminiKey ? 'Set' : 'Not set'
-    });
-
     const missing = Object.entries(required)
-        .filter(([key, value]) => {
-            const isMissing = !value;
-            console.log(`Checking ${key}:`, { exists: !!value });
-            return isMissing;
-        })
+        .filter(([, value]) => !value)
         .map(([key]) => key);
 
     if (missing.length > 0) {
-        console.error('Missing required configuration:', missing);
+        console.error('❌ Missing required configuration:', missing);
         process.exit(1);
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+        console.log('✅ Configuration validated successfully');
     }
 };
 

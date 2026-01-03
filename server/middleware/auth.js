@@ -4,49 +4,45 @@ const config = require('../config/config');
 
 const auth = async (req, res, next) => {
   try {
-    console.log('Checking authentication...');
-    console.log('Headers:', {
-      ...req.headers,
-      authorization: req.headers.authorization ? '[HIDDEN]' : 'Not present'
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Checking authentication...');
+    }
 
     // Get token from header
     const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
-      console.log('No token provided');
       throw new Error('No authentication token found');
     }
 
     // Verify token
-    console.log('Verifying token...');
     const decoded = jwt.verify(token, config.jwt.secret);
-    console.log('Token decoded:', { userId: decoded.userId });
 
     // Find user
     const user = await User.findOne({ _id: decoded.userId });
     if (!user) {
-      console.log('User not found for token');
       throw new Error('User not found');
     }
 
-    console.log('Authentication successful:', {
-      userId: user._id,
-      username: user.username
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Authentication successful:', {
+        userId: user._id,
+        username: user.username
+      });
+    }
 
     req.user = user;
     req.token = token;
     next();
   } catch (error) {
-    console.error('Authentication error:', {
-      message: error.message,
-      name: error.name
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Authentication error:', error.message);
+    }
 
+    // Don't expose detailed error messages in production
     res.status(401).json({ 
       error: true,
-      message: 'Please authenticate'
+      message: 'Authentication failed'
     });
   }
 };

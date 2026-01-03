@@ -49,10 +49,19 @@ if (missingVars.length > 0) {
 }
 
 // Middleware
-// Security headers with helmet
+// Security headers with Helmet
 app.use(helmet({
-  contentSecurityPolicy: false, // Disable for API server
-  crossOriginEmbedderPolicy: false
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "https:"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", process.env.FRONTEND_URL || "http://localhost:3000"].filter(Boolean)
+    }
+  },
+  crossOriginEmbedderPolicy: false // Allow external resources
 }));
 
 // Configure CORS with secure defaults
@@ -117,13 +126,17 @@ app.use(express.static('public'));
 const connectDB = async () => {
   try {
     console.log('Attempting to connect to MongoDB...');
-    console.log('Database URL:', config.mongodb.uri.replace(
-      /(mongodb\+srv:\/\/[^:]+:)([^@]+)(@.+)/,
-      '$1[HIDDEN]$3'
-    ));
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Database URL:', config.mongodb.uri.replace(
+        /(mongodb\+srv:\/\/[^:]+:)([^@]+)(@.+)/,
+        '$1[HIDDEN]$3'
+      ));
+    }
 
-    // Add mongoose debug logging
-    mongoose.set('debug', true);
+    // Add mongoose debug logging only in development
+    if (process.env.NODE_ENV !== 'production') {
+      mongoose.set('debug', true);
+    }
 
     await mongoose.connect(config.mongodb.uri, {
       dbName: 'appstruct'
@@ -151,51 +164,57 @@ const connectDB = async () => {
 // Initialize database connection
 connectDB().catch(console.error);
 
-// Add request logging middleware
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`, {
-    body: req.body,
-    query: req.query,
-    headers: {
-      ...req.headers,
-      authorization: req.headers.authorization ? '[HIDDEN]' : undefined
-    }
+// Add request logging middleware (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.path}`, {
+      body: req.body,
+      query: req.query,
+      headers: {
+        ...req.headers,
+        authorization: req.headers.authorization ? '[HIDDEN]' : undefined
+      }
+    });
+    next();
   });
-  next();
-});
+}
 
 // Routes
 app.use('/api/auth', authRoutes);
 
-// DNS test endpoint (for debugging)
-app.get('/api/dns-test', async (req, res) => {
-  const dns = require('dns').promises;
-  try {
-    const addresses = await dns.resolve4('api.openrouter.ai');
-    res.json({
-      success: true,
-      hostname: 'api.openrouter.ai',
-      addresses: addresses,
-      message: 'DNS resolution successful'
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      code: error.code,
-      message: 'DNS resolution failed on Railway'
-    });
-  }
-});
+// DNS test endpoint (for debugging - only in development)
+if (process.env.NODE_ENV !== 'production') {
+  app.get('/api/dns-test', async (req, res) => {
+    const dns = require('dns').promises;
+    try {
+      const addresses = await dns.resolve4('generativelanguage.googleapis.com');
+      res.json({
+        success: true,
+        hostname: 'generativelanguage.googleapis.com',
+        addresses: addresses,
+        message: 'DNS resolution successful'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        code: error.code,
+        message: 'DNS resolution failed'
+      });
+    }
+  });
+}
 
 // Protected routes
 app.post('/api/generate', generateLimiter, auth, async (req, res) => {
   try {
-    console.log('Generate request received:', {
-      user: req.user?._id,
-      platform: req.body.platform,
-      ideaLength: req.body.idea?.length || 0
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Generate request received:', {
+        user: req.user?._id,
+        platform: req.body.platform,
+        ideaLength: req.body.idea?.length || 0
+      });
+    }
 
     const { idea, platform } = req.body;
     
@@ -236,21 +255,21 @@ app.post('/api/generate', generateLimiter, auth, async (req, res) => {
       });
     }
 
-    console.log('Calling Gemini API with:', { idea, platform });
     const markdown = await generateBlueprint(idea, platform);
-    console.log('Generated markdown length:', markdown?.length || 0);
+    
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Generated markdown length:', markdown?.length || 0);
+    }
     
     res.json({ markdown });
   } catch (error) {
-    console.error('Generate API Error:', {
-      message: error.message,
-      user: req.user?._id
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Generate API Error:', error.message);
+    }
 
     res.status(500).json({
       error: true,
-      message: error.message,
-      details: error.response?.data
+      message: 'Error generating blueprint'
     });
   }
 });
@@ -258,12 +277,14 @@ app.post('/api/generate', generateLimiter, auth, async (req, res) => {
 // Streaming endpoint for real-time blueprint generation
 app.post('/api/generate-stream', generateLimiter, auth, async (req, res) => {
   try {
-    console.log('Streaming generate request received:', {
-      user: req.user?._id,
-      platform: req.body.platform,
-      detailLevel: req.body.detailLevel,
-      ideaLength: req.body.idea?.length || 0
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Streaming generate request received:', {
+        user: req.user?._id,
+        platform: req.body.platform,
+        detailLevel: req.body.detailLevel,
+        ideaLength: req.body.idea?.length || 0
+      });
+    }
 
     const { idea, platform, detailLevel } = req.body;
     
@@ -315,8 +336,6 @@ app.post('/api/generate-stream', generateLimiter, auth, async (req, res) => {
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Transfer-Encoding', 'chunked');
     res.setHeader('Cache-Control', 'no-cache');
-
-    console.log('Calling Gemini API with streaming:', { idea, platform, detailLevel });
     
     // Call the streaming version of generateBlueprint
     const { generateBlueprintStream } = require('./services/deepseek');
@@ -326,15 +345,14 @@ app.post('/api/generate-stream', generateLimiter, auth, async (req, res) => {
     
     res.end();
   } catch (error) {
-    console.error('Streaming Generate API Error:', {
-      message: error.message,
-      stack: error.stack
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Streaming Generate API Error:', error.message);
+    }
 
     if (!res.headersSent) {
       res.status(500).json({
         error: true,
-        message: error.message
+        message: 'Error generating blueprint'
       });
     } else {
       res.end();
@@ -351,10 +369,12 @@ app.post('/api/blueprints', auth, async (req, res) => {
     await blueprint.save();
     res.status(201).json(blueprint);
   } catch (error) {
-    console.error('Save blueprint error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Save blueprint error:', error.message);
+    }
     res.status(400).json({ 
       error: true,
-      message: error.message 
+      message: 'Error saving blueprint'
     });
   }
 });
@@ -365,10 +385,12 @@ app.get('/api/blueprints', auth, async (req, res) => {
       .sort({ createdAt: -1 });
     res.json(blueprints);
   } catch (error) {
-    console.error('Get blueprints error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Get blueprints error:', error.message);
+    }
     res.status(500).json({ 
       error: true,
-      message: error.message 
+      message: 'Error fetching blueprints'
     });
   }
 });

@@ -1,48 +1,15 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const rateLimit = require('express-rate-limit');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 const config = require('../config/config');
 
 const router = express.Router();
 
-// Rate limiter for auth endpoints to prevent brute force attacks
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // 5 attempts per 15 minutes
-  message: { error: true, message: 'Too many authentication attempts. Please try again in 15 minutes.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
-// Validation helper functions
-const isValidEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
-
-const isStrongPassword = (password) => {
-  // At least 8 characters, 1 uppercase, 1 lowercase, 1 number
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-  return passwordRegex.test(password);
-};
-
-const sanitizeInput = (input) => {
-  if (typeof input !== 'string') return input;
-  // Remove potential XSS characters
-  return input.replace(/[<>]/g, '');
-};
-
 // Register new user
-router.post('/register', authLimiter, async (req, res) => {
+router.post('/register', async (req, res) => {
   try {
-    console.log('Registration attempt:', {
-      username: req.body.username,
-      email: req.body.email
-    });
-
-    let { username, email, password } = req.body;
+    const { username, email, password } = req.body;
 
     // Validate input
     if (!username || !email || !password) {
@@ -52,46 +19,20 @@ router.post('/register', authLimiter, async (req, res) => {
       });
     }
 
-    // Type validation
-    if (typeof username !== 'string' || typeof email !== 'string' || typeof password !== 'string') {
+    // Validate password strength
+    if (password.length < 6) {
       return res.status(400).json({
         error: true,
-        message: 'Invalid input types'
+        message: 'Password must be at least 6 characters long'
       });
     }
 
-    // Sanitize inputs
-    username = sanitizeInput(username.trim());
-    email = email.trim().toLowerCase();
-
     // Validate email format
-    if (!isValidEmail(email)) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
       return res.status(400).json({
         error: true,
         message: 'Invalid email format'
-      });
-    }
-
-    // Validate username length and format
-    if (username.length < 3 || username.length > 30) {
-      return res.status(400).json({
-        error: true,
-        message: 'Username must be between 3 and 30 characters'
-      });
-    }
-
-    if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
-      return res.status(400).json({
-        error: true,
-        message: 'Username can only contain letters, numbers, hyphens, and underscores'
-      });
-    }
-
-    // Validate password strength
-    if (!isStrongPassword(password)) {
-      return res.status(400).json({
-        error: true,
-        message: 'Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number'
       });
     }
 
@@ -101,10 +42,6 @@ router.post('/register', authLimiter, async (req, res) => {
     });
 
     if (existingUser) {
-      console.log('User already exists:', {
-        email: existingUser.email,
-        username: existingUser.username
-      });
       return res.status(400).json({
         error: true,
         message: 'User already exists'
@@ -119,11 +56,10 @@ router.post('/register', authLimiter, async (req, res) => {
     });
 
     await user.save();
-    console.log('User created successfully:', {
-      id: user._id,
-      username: user.username,
-      email: user.email
-    });
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('User created successfully:', user._id);
+    }
 
     // Generate token
     const token = jwt.sign(
@@ -141,10 +77,9 @@ router.post('/register', authLimiter, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Registration error:', {
-      message: error.message,
-      code: error.code
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Registration error:', error.message);
+    }
     res.status(500).json({
       error: true,
       message: 'Error creating user'
@@ -153,12 +88,8 @@ router.post('/register', authLimiter, async (req, res) => {
 });
 
 // Login user
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', async (req, res) => {
   try {
-    console.log('Login attempt:', {
-      email: req.body.email
-    });
-
     const { email, password } = req.body;
 
     // Validate input
@@ -169,15 +100,8 @@ router.post('/login', authLimiter, async (req, res) => {
       });
     }
 
-    if (typeof email !== 'string' || typeof password !== 'string') {
-      return res.status(400).json({
-        error: true,
-        message: 'Invalid input types'
-      });
-    }
-
     // Find user
-    const user = await User.findOne({ email: email.trim().toLowerCase() });
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({
         error: true,
@@ -201,11 +125,9 @@ router.post('/login', authLimiter, async (req, res) => {
       { expiresIn: '7d' }
     );
 
-    console.log('Login successful:', {
-      id: user._id,
-      username: user.username,
-      email: user.email
-    });
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Login successful:', user._id);
+    }
 
     res.json({
       token,
@@ -216,7 +138,9 @@ router.post('/login', authLimiter, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Login error:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Login error:', error.message);
+    }
     res.status(500).json({
       error: true,
       message: 'Error logging in'
@@ -227,11 +151,6 @@ router.post('/login', authLimiter, async (req, res) => {
 // Get current user
 router.get('/me', auth, async (req, res) => {
   try {
-    console.log('Fetching user profile:', {
-      id: req.user._id,
-      username: req.user.username
-    });
-
     res.json({
       user: {
         id: req.user._id,
@@ -240,7 +159,9 @@ router.get('/me', auth, async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error fetching user profile:', error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error('Error fetching user profile:', error.message);
+    }
     res.status(500).json({
       error: true,
       message: 'Error fetching user data'
