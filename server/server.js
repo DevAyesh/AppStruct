@@ -25,6 +25,12 @@ const auth = require('./middleware/auth');
 
 const app = express();
 
+// Trust proxy for Railway/production deployments
+// This allows express-rate-limit to correctly identify users via X-Forwarded-For header
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1); // Trust first proxy (Railway)
+}
+
 // Debug environment variables (without exposing sensitive data)
 console.log('Environment check:', {
   NODE_ENV: process.env.NODE_ENV,
