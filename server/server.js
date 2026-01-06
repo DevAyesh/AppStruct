@@ -170,11 +170,17 @@ const connectDB = async () => {
 // Initialize database connection
 connectDB().catch(console.error);
 
-// Add request logging middleware (only in development)
+// Add request logging middleware (only in development, with sensitive data sanitization)
 if (process.env.NODE_ENV !== 'production') {
   app.use((req, res, next) => {
+    // Create sanitized body copy to prevent password leaks
+    const sanitizedBody = { ...req.body };
+    if (sanitizedBody.password) sanitizedBody.password = '[HIDDEN]';
+    if (sanitizedBody.newPassword) sanitizedBody.newPassword = '[HIDDEN]';
+    if (sanitizedBody.oldPassword) sanitizedBody.oldPassword = '[HIDDEN]';
+    
     console.log(`${req.method} ${req.path}`, {
-      body: req.body,
+      body: sanitizedBody,
       query: req.query,
       headers: {
         ...req.headers,
