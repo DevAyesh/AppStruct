@@ -47,14 +47,6 @@ Please be specific, technical, and actionable in your response.`;
       throw new Error('GEMINI_API_KEY is not set in environment variables');
     }
 
-    // Log API key format (safely) - removed in production for security
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('API Key format check:', {
-        isGeminiKey: apiKey.startsWith('AIza'),
-        length: apiKey.length
-      });
-    }
-
     // Initialize Google Generative AI
     console.log('Initializing Google Gemini API...');
     const genAI = new GoogleGenerativeAI(apiKey);
