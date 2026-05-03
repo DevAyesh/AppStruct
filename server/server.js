@@ -44,7 +44,7 @@ console.log('Environment check:', {
 });
 
 // Verify required environment variables
-const requiredEnvVars = ['MONGODB_URI', 'PORT', 'GEMINI_API_KEY', 'JWT_SECRET'];
+const requiredEnvVars = ['MONGODB_URI', 'GEMINI_API_KEY', 'JWT_SECRET'];
 const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
 
 if (missingVars.length > 0) {
@@ -190,6 +190,11 @@ if (process.env.NODE_ENV !== 'production') {
     next();
   });
 }
+
+// Health check route for Render
+app.get('/healthz', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

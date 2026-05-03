@@ -30,7 +30,6 @@ function App() {
   const [toast, setToast] = useState(null);
   const [isAuthMode, setIsAuthMode] = useState('login'); // 'login' or 'register'
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar state
-  const [authError, setAuthError] = useState(null); // Authentication error state
 
   // Toast notification helper
   const showToast = (message, type = 'success') => {
@@ -71,7 +70,6 @@ function App() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setAuthError(null); // Clear previous errors
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
@@ -87,9 +85,7 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        const errorMessage = data.message || data.error || 'Login failed';
-        setAuthError(errorMessage);
-        return;
+        throw new Error(data.error || 'Login failed');
       }
 
       // Save token and user data
@@ -97,18 +93,16 @@ function App() {
       setAuthToken(data.token);
       setUser(data.user);
       setIsLoginModalOpen(false);
-      setAuthError(null);
-      setLoginForm({ email: '', password: '' }); // Clear form
+      setError(null);
       showToast('Welcome back!', 'success');
     } catch (error) {
-      const errorMessage = error.message || 'An error occurred. Please try again.';
-      setAuthError(errorMessage);
+      setError(error.message);
+      showToast(error.message, 'error');
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setAuthError(null); // Clear previous errors
     try {
       const username = loginForm.email.split('@')[0];
       const response = await fetch(`${API_URL}/api/auth/register`, {
@@ -126,9 +120,7 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        const errorMessage = data.message || data.error || 'Registration failed';
-        setAuthError(errorMessage);
-        return;
+        throw new Error(data.message || data.error || 'Registration failed');
       }
 
       // Auto-login after registration
@@ -136,12 +128,11 @@ function App() {
       setAuthToken(data.token);
       setUser(data.user);
       setIsLoginModalOpen(false);
-      setAuthError(null);
-      setLoginForm({ email: '', password: '' }); // Clear form
+      setError(null);
       showToast('Account created successfully!', 'success');
     } catch (error) {
-      const errorMessage = error.message || 'An error occurred. Please try again.';
-      setAuthError(errorMessage);
+      setError(error.message);
+      showToast(error.message, 'error');
     }
   };
 
@@ -634,8 +625,7 @@ function App() {
               <button
                 onClick={() => {
                   setIsLoginModalOpen(false);
-                  setAuthError(null);
-                  setLoginForm({ email: '', password: '' }); // Clear form
+                  setError(null);
                 }}
                 className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
               >
@@ -646,10 +636,7 @@ function App() {
             {/* Tab Switcher */}
             <div className="flex space-x-2 mb-4 sm:mb-6 p-1 bg-gray-100 rounded-xl sm:rounded-2xl">
               <button
-                onClick={() => {
-                  setIsAuthMode('login');
-                  setAuthError(null); // Clear error when switching modes
-                }}
+                onClick={() => setIsAuthMode('login')}
                 className={`flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   isAuthMode === 'login'
                     ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
@@ -659,10 +646,7 @@ function App() {
                 Sign In
               </button>
               <button
-                onClick={() => {
-                  setIsAuthMode('register');
-                  setAuthError(null); // Clear error when switching modes
-                }}
+                onClick={() => setIsAuthMode('register')}
                 className={`flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   isAuthMode === 'register'
                     ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
@@ -673,22 +657,6 @@ function App() {
               </button>
             </div>
 
-            {/* Error Message Display */}
-            {authError && (
-              <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 sm:p-4 flex items-start space-x-2">
-                <HiExclamationCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm text-red-700 font-medium">{authError}</p>
-                </div>
-                <button 
-                  onClick={() => setAuthError(null)} 
-                  className="text-red-400 hover:text-red-600 flex-shrink-0"
-                >
-                  <HiX className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
             <form onSubmit={isAuthMode === 'login' ? handleLogin : handleRegister} className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
@@ -698,15 +666,8 @@ function App() {
                   type="email"
                   id="email"
                   value={loginForm.email}
-                  onChange={(e) => {
-                    setLoginForm({ ...loginForm, email: e.target.value });
-                    setAuthError(null); // Clear error when user starts typing
-                  }}
-                  className={`block w-full px-4 py-2.5 sm:py-3 rounded-xl border text-sm transition-all ${
-                    authError 
-                      ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-                      : 'border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200'
-                  }`}
+                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                  className="block w-full px-4 py-2.5 sm:py-3 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm transition-all"
                   placeholder="you@example.com"
                   required
                 />
@@ -719,15 +680,8 @@ function App() {
                   type="password"
                   id="password"
                   value={loginForm.password}
-                  onChange={(e) => {
-                    setLoginForm({ ...loginForm, password: e.target.value });
-                    setAuthError(null); // Clear error when user starts typing
-                  }}
-                  className={`block w-full px-4 py-2.5 sm:py-3 rounded-xl border text-sm transition-all ${
-                    authError 
-                      ? 'border-red-300 focus:border-red-500 focus:ring-2 focus:ring-red-200' 
-                      : 'border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200'
-                  }`}
+                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                  className="block w-full px-4 py-2.5 sm:py-3 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm transition-all"
                   placeholder="••••••••"
                   required
                 />
