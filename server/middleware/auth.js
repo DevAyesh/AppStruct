@@ -2,14 +2,23 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config/config');
 
+const getCookieValue = (cookieHeader, key) => {
+  if (!cookieHeader) return null;
+  const cookies = cookieHeader.split(';').map(part => part.trim());
+  const match = cookies.find(cookie => cookie.startsWith(`${key}=`));
+  return match ? decodeURIComponent(match.slice(key.length + 1)) : null;
+};
+
 const auth = async (req, res, next) => {
   try {
     if (process.env.NODE_ENV !== 'production') {
       console.log('Checking authentication...');
     }
 
-    // Get token from header
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    // Get token from Authorization header or httpOnly cookie
+    const bearerToken = req.header('Authorization')?.replace('Bearer ', '');
+    const cookieToken = getCookieValue(req.headers.cookie, 'authToken');
+    const token = bearerToken || cookieToken;
     
     if (!token) {
       throw new Error('No authentication token found');
