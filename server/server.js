@@ -70,13 +70,9 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false // Allow external resources
 }));
 
-// Configure CORS with secure defaults
+// Configure CORS with strict allowlist
 const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [
-      process.env.FRONTEND_URL,
-      /\.vercel\.app$/,
-      /\.railway\.app$/
-    ].filter(Boolean)
+  ? [process.env.FRONTEND_URL].filter(Boolean)
   : ['http://localhost:3000', 'http://localhost:3001'];
 
 app.use(cors({
@@ -84,11 +80,7 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps, curl, postman)
     if (!origin) return callback(null, true);
     
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (typeof allowed === 'string') return allowed === origin;
-      if (allowed instanceof RegExp) return allowed.test(origin);
-      return false;
-    });
+    const isAllowed = allowedOrigins.includes(origin);
     
     if (isAllowed) {
       callback(null, true);
@@ -102,7 +94,7 @@ app.use(cors({
   credentials: true,
   maxAge: 86400 // 24 hours
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10kb' }));
 
 // Rate limiting for API endpoints
 const apiLimiter = rateLimit({
@@ -118,6 +110,23 @@ const generateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // Limit each IP to 10 generation requests per 15 minutes
   message: { error: true, message: 'Too many generation requests. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limiting for authentication endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: true, message: 'Too many authentication attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const verifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: true, message: 'Too many verification attempts. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -184,7 +193,8 @@ if (process.env.NODE_ENV !== 'production') {
       query: req.query,
       headers: {
         ...req.headers,
-        authorization: req.headers.authorization ? '[HIDDEN]' : undefined
+        authorization: req.headers.authorization ? '[HIDDEN]' : undefined,
+        cookie: req.headers.cookie ? '[HIDDEN]' : undefined
       }
     });
     next();
@@ -197,6 +207,12 @@ app.get('/healthz', (req, res) => {
 });
 
 // Routes
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
+app.use('/api/auth/google', authLimiter);
+app.use('/api/auth/forgot-password', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
+app.use('/api/auth/verify-email', verifyLimiter);
 app.use('/api/auth', authRoutes);
 
 // DNS test endpoint (for debugging - only in development)
@@ -379,8 +395,34 @@ app.post('/api/generate-stream', generateLimiter, auth, async (req, res) => {
 
 app.post('/api/blueprints', auth, async (req, res) => {
   try {
+    const { ideaInput, platform, generatedMarkdown } = req.body;
+
+    if (!ideaInput || !platform || !generatedMarkdown) {
+      return res.status(400).json({
+        error: true,
+        message: 'ideaInput, platform, and generatedMarkdown are required'
+      });
+    }
+
+    if (typeof ideaInput !== 'string' || typeof platform !== 'string' || typeof generatedMarkdown !== 'string') {
+      return res.status(400).json({
+        error: true,
+        message: 'Invalid blueprint payload'
+      });
+    }
+
+    const validPlatforms = ['web', 'mobile', 'both'];
+    if (!validPlatforms.includes(platform.toLowerCase())) {
+      return res.status(400).json({
+        error: true,
+        message: 'Invalid platform. Must be one of: web, mobile, both'
+      });
+    }
+
     const blueprint = new Blueprint({
-      ...req.body,
+      ideaInput: ideaInput.trim(),
+      platform: platform.toLowerCase(),
+      generatedMarkdown,
       userId: req.user._id
     });
     await blueprint.save();

@@ -11,9 +11,12 @@ import {
   HiX,
   HiCheckCircle,
   HiExclamationCircle,
-  HiClipboardCopy
+  HiClipboardCopy,
+  HiEye,
+  HiEyeOff
 } from 'react-icons/hi';
 import API_URL from './config/api';
+import { GoogleLogin } from '@react-oauth/google';
 
 function App() {
   const [appIdea, setAppIdea] = useState('');
@@ -23,12 +26,16 @@ function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [user, setUser] = useState(null);
   const [savedBlueprints, setSavedBlueprints] = useState([]);
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  const [loginForm, setLoginForm] = useState({ email: '', password: '', confirmPassword: '' });
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
-  const [authToken, setAuthToken] = useState(localStorage.getItem('authToken'));
+  const [, setAuthToken] = useState(null);
   const [toast, setToast] = useState(null);
   const [isAuthMode, setIsAuthMode] = useState('login'); // 'login' or 'register'
+  const [resetToken, setResetToken] = useState(null);
+  const [authSuccess, setAuthSuccess] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar state
 
   // Toast notification helper
@@ -37,29 +44,37 @@ function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Load token from localStorage on startup
+  // Handle verification/reset tokens and restore session via cookie
   useEffect(() => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      setAuthToken(token);
-      fetchUserProfile(token);
+    const params = new URLSearchParams(window.location.search);
+    const verifyToken = params.get('verifyToken');
+    const resetTokenFromUrl = params.get('resetToken');
+  
+    if (verifyToken) {
+      verifyEmail(verifyToken);
     }
+  
+    if (resetTokenFromUrl) {
+      setResetToken(resetTokenFromUrl);
+      setIsAuthMode('reset');
+      setIsLoginModalOpen(true);
+    }
+  
+    fetchUserProfile();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchUserProfile = async (token) => {
+  const fetchUserProfile = async () => {
     try {
       const response = await fetch(`${API_URL}/api/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'include'
       });
 
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
+        setAuthToken('cookie-session');
       } else {
-        // If token is invalid, clear it
-        localStorage.removeItem('authToken');
         setAuthToken(null);
         setUser(null);
       }
@@ -73,6 +88,7 @@ function App() {
     try {
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -85,28 +101,142 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Login failed');
+        throw new Error(data.message || 'Login failed');
       }
 
-      // Save token and user data
-      localStorage.setItem('authToken', data.token);
-      setAuthToken(data.token);
+      // Session is stored in secure httpOnly cookie
+      setAuthToken('cookie-session');
       setUser(data.user);
       setIsLoginModalOpen(false);
       setError(null);
       showToast('Welcome back!', 'success');
     } catch (error) {
       setError(error.message);
+    }
+  };
+
+  const handleGoogleLogin = async (credentialResponse) => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/google`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: credentialResponse.credential })
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(data.message || 'Google login failed');
+      }
+  
+      setAuthToken('cookie-session');
+      setUser(data.user);
+      setIsLoginModalOpen(false);
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  const verifyEmail = async (token) => {
+    try {
+      const response = await fetch(`${API_URL}/api/auth/verify-email`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+  
+      const data = await response.json();
+  
+      if (!response.ok) {
+        throw new Error(data.message || 'Email verification failed');
+      }
+  
+      showToast(data.message, 'success');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (error) {
       showToast(error.message, 'error');
+    }
+  };
+
+  // Forgot password
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch(`${API_URL}/api/auth/forgot-password`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loginForm.email })
+      });
+      const data = await response.json();
+      setError(null);
+      setAuthSuccess(data.message || 'If an account exists, a reset link has been sent. Check your inbox.');
+    } catch (error) {
+      setError('Failed to send reset email. Please try again.');
+    }
+  };
+  
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+
+    const passwordStrong = /^(?=.*[a-zA-Z])(?=.*[0-9]).{8,}$/;
+    if (!passwordStrong.test(loginForm.password)) {
+      setError('Password must be at least 8 characters and include both letters and numbers.');
+      return;
+    }
+
+    if (loginForm.password !== loginForm.confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/api/auth/reset-password`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: resetToken,
+          password: loginForm.password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || 'Password reset failed');
+        return;
+      }
+
+      setError(null);
+      setResetToken(null);
+      window.history.replaceState({}, document.title, window.location.pathname);
+      setAuthSuccess('Password reset successful! You can now sign in with your new password.');
+    } catch (error) {
+      setError('Password reset failed. Please try again.');
     }
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
+      const passwordStrong = /^(?=.*[a-zA-Z])(?=.*[0-9]).{8,}$/;
+      if (!passwordStrong.test(loginForm.password)) {
+        setError('Password must be at least 8 characters and include both letters and numbers.');
+        return;
+      }
+
+      if (loginForm.password !== loginForm.confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
+
       const username = loginForm.email.split('@')[0];
       const response = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -123,24 +253,32 @@ function App() {
         throw new Error(data.message || data.error || 'Registration failed');
       }
 
-      // Auto-login after registration
-      localStorage.setItem('authToken', data.token);
-      setAuthToken(data.token);
-      setUser(data.user);
-      setIsLoginModalOpen(false);
       setError(null);
-      showToast('Account created successfully!', 'success');
+      setAuthSuccess(data.message || 'Account created! Please check your email to verify your account before signing in.');
     } catch (error) {
       setError(error.message);
-      showToast(error.message, 'error');
     }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_URL}/api/auth/logout`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (logoutError) {
+      console.error('Logout request failed:', logoutError);
+    }
+
     setAuthToken(null);
     setUser(null);
     setSavedBlueprints([]);
+    setLoginForm({ email: '', password: '', confirmPassword: '' });
+    setError(null);
+    setAuthSuccess(null);
+    setIsAuthMode('login');
+    setShowPassword(false);
+    setShowConfirmPassword(false);
   };
 
   const generateBlueprint = async () => {
@@ -149,8 +287,7 @@ function App() {
       setError(null);
       setBlueprint(''); // Clear previous blueprint
 
-      const token = localStorage.getItem('authToken');
-      if (!token) {
+      if (!user) {
         setIsLoginModalOpen(true);
         setIsGenerating(false);
         return;
@@ -164,9 +301,9 @@ function App() {
 
       const response = await fetch(`${API_URL}/api/generate-stream`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           idea: appIdea,
@@ -197,9 +334,9 @@ function App() {
       // Save the blueprint after generation
       const saveResponse = await fetch(`${API_URL}/api/blueprints`, {
         method: 'POST',
+        credentials: 'include',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           ideaInput: appIdea,
@@ -225,13 +362,11 @@ function App() {
   };
 
   const fetchBlueprints = async () => {
-    if (!authToken) return;
+    if (!user) return;
 
     try {
       const response = await fetch(`${API_URL}/api/blueprints`, {
-        headers: {
-          'Authorization': `Bearer ${authToken}`
-        }
+        credentials: 'include'
       });
       
       if (!response.ok) {
@@ -301,7 +436,7 @@ function App() {
               ) : (
                 <>
                   <button
-                    onClick={() => setIsLoginModalOpen(true)}
+                    onClick={() => { setIsLoginModalOpen(true); setLoginForm({ email: '', password: '', confirmPassword: '' }); setError(null); setAuthSuccess(null); setShowPassword(false); setShowConfirmPassword(false); }}
                     className="px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-700 hover:bg-white/50 rounded-full transition-colors"
                   >
                     Log In
@@ -310,6 +445,11 @@ function App() {
                     onClick={() => {
                       setIsAuthMode('register');
                       setIsLoginModalOpen(true);
+                      setLoginForm({ email: '', password: '', confirmPassword: '' });
+                      setError(null);
+                      setAuthSuccess(null);
+                      setShowPassword(false);
+                      setShowConfirmPassword(false);
                     }}
                     className="px-3 sm:px-5 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-full transition-all shadow-md"
                   >
@@ -339,7 +479,7 @@ function App() {
               </div>
 
               {/* Error Message */}
-              {error && (
+              {error && !isLoginModalOpen && (
                 <div className="mb-4 bg-red-50 border border-red-200 rounded-xl sm:rounded-2xl p-3 sm:p-4 flex items-center justify-between max-w-3xl mx-auto">
                   <div className="flex items-center space-x-2">
                     <HiExclamationCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 flex-shrink-0" />
@@ -626,6 +766,10 @@ function App() {
                 onClick={() => {
                   setIsLoginModalOpen(false);
                   setError(null);
+                  setAuthSuccess(null);
+                  setShowPassword(false);
+                  setShowConfirmPassword(false);
+                  setLoginForm({ email: '', password: '', confirmPassword: '' });
                 }}
                 className="text-gray-400 hover:text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
               >
@@ -636,7 +780,7 @@ function App() {
             {/* Tab Switcher */}
             <div className="flex space-x-2 mb-4 sm:mb-6 p-1 bg-gray-100 rounded-xl sm:rounded-2xl">
               <button
-                onClick={() => setIsAuthMode('login')}
+                onClick={() => { setIsAuthMode('login'); setError(null); setAuthSuccess(null); setShowPassword(false); setShowConfirmPassword(false); setLoginForm(f => ({ ...f, password: '', confirmPassword: '' })); }}
                 className={`flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   isAuthMode === 'login'
                     ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
@@ -646,7 +790,7 @@ function App() {
                 Sign In
               </button>
               <button
-                onClick={() => setIsAuthMode('register')}
+                onClick={() => { setIsAuthMode('register'); setError(null); setAuthSuccess(null); setShowPassword(false); setShowConfirmPassword(false); setLoginForm(f => ({ ...f, password: '', confirmPassword: '' })); }}
                 className={`flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                   isAuthMode === 'register'
                     ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
@@ -657,42 +801,155 @@ function App() {
               </button>
             </div>
 
-            <form onSubmit={isAuthMode === 'login' ? handleLogin : handleRegister} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-                  Email address
-                </label>
-                <input
-                  type="email"
-                  id="email"
-                  value={loginForm.email}
-                  onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
-                  className="block w-full px-4 py-2.5 sm:py-3 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm transition-all"
-                  placeholder="you@example.com"
-                  required
-                />
+            {authSuccess ? (
+              <div className="py-6 flex flex-col items-center text-center space-y-4">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                  <HiCheckCircle className="w-10 h-10 text-green-500" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  {isAuthMode === 'reset' ? 'Password Updated!' : 'Check your email'}
+                </h3>
+                <p className="text-sm text-gray-600">{authSuccess}</p>
+                <button
+                  type="button"
+                  onClick={() => { setAuthSuccess(null); setIsAuthMode('login'); setLoginForm({ email: '', password: '', confirmPassword: '' }); }}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-all shadow-lg text-sm"
+                >
+                  Go to Sign In
+                </button>
               </div>
-              <div>
-                <label htmlFor="password" className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-                  Password
-                </label>
-                <input
-                  type="password"
-                  id="password"
-                  value={loginForm.password}
-                  onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
-                  className="block w-full px-4 py-2.5 sm:py-3 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm transition-all"
-                  placeholder="••••••••"
-                  required
-                />
+            ) : (
+            <>
+            {error && (
+              <div className="mb-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <HiExclamationCircle className="h-5 w-5 text-red-500 flex-shrink-0" />
+                  <span className="text-sm text-red-700">{error}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setError(null)}
+                  className="text-red-400 hover:text-red-600 flex-shrink-0"
+                >
+                  <HiX className="w-4 h-4" />
+                </button>
               </div>
+            )}
+
+            <form
+                onSubmit={
+                  isAuthMode === 'login'
+                    ? handleLogin
+                    : isAuthMode === 'register'
+                    ? handleRegister
+                    : isAuthMode === 'forgot'
+                    ? handleForgotPassword
+                    : handleResetPassword
+                }
+                className="space-y-4"
+              >
+              {isAuthMode !== 'reset' && (
+                <div>
+                  <label htmlFor="email" className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
+                    Email address
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={loginForm.email}
+                    onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
+                    className="block w-full px-4 py-2.5 sm:py-3 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm transition-all"
+                    placeholder="you@example.com"
+                    required
+                  />
+                </div>
+              )}
+              {isAuthMode !== 'forgot' && (
+                <div>
+                  <label htmlFor="password" className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
+                    {isAuthMode === 'reset' ? 'New Password' : 'Password'}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="password"
+                      value={loginForm.password}
+                      onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                      className="block w-full px-4 py-2.5 sm:py-3 pr-11 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm transition-all"
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showPassword ? <HiEyeOff className="w-5 h-5" /> : <HiEye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                  {(isAuthMode === 'reset' || isAuthMode === 'register') && (
+                    <p className="mt-1 text-xs text-gray-400">Min 8 characters, include letters and numbers</p>
+                  )}
+                </div>
+              )}
+
+              {(isAuthMode === 'reset' || isAuthMode === 'register') && (
+                <div>
+                  <label htmlFor="confirmPassword" className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      id="confirmPassword"
+                      value={loginForm.confirmPassword}
+                      onChange={(e) => setLoginForm({ ...loginForm, confirmPassword: e.target.value })}
+                      className="block w-full px-4 py-2.5 sm:py-3 pr-11 rounded-xl border border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm transition-all"
+                      placeholder="••••••••"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      {showConfirmPassword ? <HiEyeOff className="w-5 h-5" /> : <HiEye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {isAuthMode === 'login' && (
+                  <button
+                    type="button"
+                    onClick={() => setIsAuthMode('forgot')}
+                    className="text-sm text-purple-600 hover:text-purple-700"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+
               <button
                 type="submit"
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-2.5 sm:py-3 px-4 rounded-xl transition-all shadow-lg hover:shadow-xl text-sm"
               >
-                {isAuthMode === 'login' ? 'Sign in' : 'Create account'}
+                {isAuthMode === 'login'
+                  ? 'Sign in'
+                  : isAuthMode === 'register'
+                  ? 'Create account'
+                  : isAuthMode === 'forgot'
+                  ? 'Send reset link'
+                  : 'Reset password'}
               </button>
             </form>
+            <div className="mt-4 flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleLogin}
+                onError={() => alert('Google sign-in failed')}
+              />
+            </div>
+            </>
+            )}
           </div>
         </div>
       )}
